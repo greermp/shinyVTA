@@ -8,10 +8,14 @@
 #
 
 library(shiny)
+library(shinydashboard)
 library(scales)
 library(ggthemes)
 library(RColorBrewer)
+library(networkD3)
 library(tidyverse)
+library(leaflet)
+# library(tigris)
 # Define server logic required to draw a histogram
 shinyServer(function(input, output) {
     # setwd("~/MSBA/MOD5/shinyex/example") 
@@ -86,5 +90,86 @@ shinyServer(function(input, output) {
             theme_tufte() + scale_fill_brewer(palette = palette)
 
     })
+    
+    output$plot <- renderSankeyNetwork({
+        
+        factor1Sankey <- invoice %>%  filter(CAR_YEAR >= input$age) %>%
+            group_by(visit) %>% 
+            summarise(visits=n()) %>% 
+            filter(visit<=6) %>% mutate( group="factor1Sankey") %>% 
+            arrange(desc(visits))  %>% mutate(per=paste0(round(visits/lag(visits)*100),'%'))
+        # rowwise() %>% mutate(per=paste0(visits,"\n",per))
+        
+        factor2Sankey  <- invoice %>% filter(CAR_YEAR<input$age) %>%
+            group_by(visit) %>%
+            summarise(visits=n()) %>% 
+            filter(visit<=6) %>% mutate(group="factor2Sankey") %>%
+            arrange(desc(visits))  %>% mutate(per=paste0(round(visits/lag(visits)*100),'%'))
+        # rowwise() %>% mutate(per=paste0(visits,"\n",per))
+        
+        
+        
+        all <- rbind(factor1Sankey,factor2Sankey)
 
+        all <-  all %>% rowwise() %>% mutate(source=case_when(
+            visit== 1 ~ "2018 Customers",
+            visit== 2 & group=="factor1Sankey" ~ "Visit 1",
+            visit== 2 & group=="factor2Sankey" ~ "Visit 1 ",
+            visit== 3 & group=="factor1Sankey" ~ "Visit 2",
+            visit== 3 & group=="factor2Sankey" ~ "Visit 2 ",
+            visit== 4 & group=="factor1Sankey" ~ "Visit 3",
+            visit== 4 & group=="factor2Sankey" ~ "Visit 3 ",
+            visit== 5 & group=="factor1Sankey" ~ "Visit 4",
+            visit== 5 & group=="factor2Sankey" ~ "Visit 4 ",
+            visit== 6 & group=="factor1Sankey" ~ "Visit 5",
+            visit== 6 & group=="factor2Sankey" ~ "Visit 5 ",
+            TRUE ~ "GFY")) %>% 
+            mutate(target=case_when(
+                source== "2018 Customers" & group=="factor2Sankey" ~ "Visit 1 ",
+                source== "2018 Customers" & group=="factor1Sankey" ~ "Visit 1",
+                source== "Visit 1 " ~ "Visit 2 ",
+                source== "Visit 1" ~ "Visit 2",
+                source== "Visit 2 " ~ "Visit 3 ",
+                source== "Visit 2" ~ "Visit 3",
+                source== "Visit 3 " ~ "Visit 4 ",
+                source== "Visit 3" ~ "Visit 4",
+                source== "Visit 4 " ~ "Visit 5 ",
+                source== "Visit 4" ~ "Visit 5",
+                source== "Visit 5 " ~ "Visit 6",
+                source== "Visit 5" ~ "Visit 6",
+                TRUE ~ "GFY"))
+        
+        
+        all$source= as.factor(all$source)
+        all$target= as.factor(all$target)
+        all
+        
+        nodes <- data.frame(
+            name=c(as.character(all$source), 
+                   as.character(all$target)) %>% unique()
+        )
+        
+        nodes
+        nodes$group <- as.factor(c("a","b","b","b","b","b","c","c","c","c","c","d"))
+        
+        # library(networkD3)
+        
+        match(all$source, nodes$name)
+        all$IDsource <- match(all$source, nodes$name)-1 
+        all$IDtarget <- match(all$target, nodes$name)-1
+        fontSize <- 16
+        nodeWidth <- 30
+        fontFamily <- "sans-serif"
+        # Make the Network
+        p <- sankeyNetwork(Links = all, Nodes = nodes,
+                           Source = "IDsource", Target = "IDtarget",
+                           Value = "visits", NodeID = "name", NodeGroup = 'group',
+                           sinksRight=FALSE, fontSize = fontSize, fontFamily = fontFamily, nodeWidth =nodeWidth, nodePadding = 20)
+
+    })
+
+    # output$leaflet <- renderLeaflet({
+    #     print("hi")
+    # })
+        
 })

@@ -3,9 +3,24 @@
 
 library(shiny)
 library(shinythemes)
-shinyUI(fluidPage(theme=shinytheme("cosmo"),
+# library(leaflet)
+library(networkD3)
+shinyUI(fluidPage(
+    theme = bslib::bs_theme(bootswatch = "flatly"),
 
     # Application title
+    # navbarPage(
+    #     "Virginia Tire and Auto",   
+    #     tabPanel("CLV - Vehicle Age", "one"),
+    #     tabPanel("VTA Locations", "two"),
+    #     tabPanel("Customers", "three"),
+    #     tabPanel("Vehicles", "four"),
+    #     navbarMenu("Map",
+    #                tabPanel("Average Revenue", "four-a"),
+    #                tabPanel("Number of customers", "four-b"),
+    #                tabPanel("Number of VINs", "four-c")
+    #     )
+    # ),
     titlePanel("Vehicle Age CLV"),
 
     sidebarLayout(
@@ -22,9 +37,29 @@ shinyUI(fluidPage(theme=shinytheme("cosmo"),
         ),
 
         # Show a plot of the generated distribution
+        
         mainPanel(
-            plotOutput("distPlot"),
-            plotOutput("revPlot")
+            tabsetPanel(
+                tabPanel("Customer Lifetime Value/Rev per Visit",
+                    fluidRow(
+                        plotOutput("distPlot")
+                    ),
+                    fluidRow(
+                        plotOutput("revPlot"),
+                    ),
+                ),
+                tabPanel("Customer Return Rate",
+                     fluidRow(
+                     sankeyNetworkOutput("plot")
+                    )
+                )#,
+                # tabPanel("map",
+                #          fluidRow(
+                #              leafletOutput("map"),
+                #              p()
+                #          )
+                # )
+            )
         )
     )
 ))
