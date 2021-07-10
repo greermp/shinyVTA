@@ -6,7 +6,9 @@ library(RColorBrewer)
 library(networkD3)
 library(tidyverse)
 library(leaflet)
+library(fontawesome)
 palette="Dark2"
+setwd("~/MSBA/shinyVTA")
 invoice <- read.csv("data/InvoiceSummary.csv")
 total.revenue <- as.numeric(round(invoice %>% summarise(sum(TOTAL_SALE_AMOUNT)), 2))
 total.customers <- as.numeric(round(invoice %>% group_by(CUSTOMER_NUMBER) %>% select(CUSTOMER_NUMBER) %>% unique() %>% nrow(), 2))
@@ -21,31 +23,31 @@ customer.2018 <- as.numeric(round(invoice %>% filter(createYear == 2018) %>% gro
 # create the server functions for the dashboard  
 server <- function(input, output) { 
   #some data manipulation to derive the values of KPI boxes
-
+  print("1")
   #creating the valueBoxOutput content
   output$value1 <- renderValueBox({
     valueBox(
-      formatC(as.numeric(total.revenue), format="f", big.mark=',')
-      ,'Total Oculus Store Revenues by 2025 (Millions)'
-      ,icon = icon("stats",lib='glyphicon')
-      ,color = "purple")  
+      paste0('$',formatC(as.numeric(total.revenue/1000000)))
+      ,'Total Reveneue'
+      ,icon = icon("money-bill-wave",lib='font-awesome')
+      ,color = "blue")  
   })
   output$value2 <- renderValueBox({ 
     valueBox(
-      formatC(as.numeric(total.customers), format="f", big.mark=',')
-      ,'Total Expected Revenue from Oculus by 2025 (Billions)'
-      ,icon = icon("facebook-square",lib='font-awesome')
+      formatC(as.numeric(total.customers), format="f", big.mark=',', drop0trailing = TRUE)
+      ,'Total Unique Customers'
+      ,icon = icon("oil-can",lib='font-awesome')
       ,color = "green")  
   })
   output$value3 <- renderValueBox({
     valueBox(
-      formatC(customer.2018, format="f", big.mark=',')
-      ,'Total Oculus Hardware Revenue by 2025 (Billions)'
-      ,icon = icon("dollar-sign",lib='font-awesome')
+      formatC(customer.2018, format="f", big.mark=',', drop0trailing = TRUE)
+      ,'New Customers in 2018'
+      ,icon = icon("smile",lib='font-awesome')
       ,color = "yellow")   
   })
   #creating the plotOutput content
-
+  print("2")
   output$two_L <- renderPlot({
     vehage <- invoice %>%
       mutate(factor=case_when(
@@ -64,11 +66,16 @@ server <- function(input, output) {
   })
   # scaleFUN <- function(x) sprintf("%.2f", x)
   output$two_R <- renderPlot({
-    print(input$age)
+    print("3")
+    start=lubridate::ymd(input$dates[1])
+    end=lubridate::ymd(input$dates[2])
+    CLVInvoice=invoice %>% filter(CUST_CREATE_DATE >= start & CUST_CREATE_DATE <= end)
+    # print(input$dates)
+    # print(input$age)
     
     
-    
-    vehage <- invoice %>% 
+    print("4")
+    vehage <- CLVInvoice %>% 
       mutate(factor=case_when(
         CAR_YEAR>=input$age ~ paste0(input$age, ' or Newer'),
         TRUE ~ paste0('Older than ',input$age)
@@ -106,29 +113,35 @@ server <- function(input, output) {
                                               prefix = "$", suffix = "",
                                               big.mark = ",", decimal.mark = ".")) +
       geom_text(nudge_y = 5,aes(x=factor, y=CLV, label=paste0(round(CLV,0),'$'))) +
-      labs(x="", title="Customer Lifetime Value Analysis", y="USD") + 
+      labs(x="", title="", y="USD") + 
       theme_tufte() + scale_fill_brewer(palette = palette)
   })
-  
+  print("5")
   output$three_L <- renderSankeyNetwork({
-    factor1Sankey <- invoice %>%  filter(CAR_YEAR >= input$age) %>%
-      group_by(visit) %>% 
-      summarise(visits=n()) %>% 
-      filter(visit<=6) %>% mutate( group="factor1Sankey") %>% 
+    print("6")
+    # h1("Hello")
+    print("7")
+    start=lubridate::ymd(input$dates[1])
+    end=lubridate::ymd(input$dates[2])
+    CLVInvoice=invoice %>% filter(CUST_CREATE_DATE >= start & CUST_CREATE_DATE <= end)
+    factor1Sankey <- CLVInvoice %>%  filter(CAR_YEAR >= input$age) %>%
+      group_by(visit) %>%
+      summarise(visits=n()) %>%
+      filter(visit<=6) %>% mutate( group="factor1Sankey") %>%
       arrange(desc(visits))  %>% mutate(per=paste0(round(visits/lag(visits)*100),'%'))
     # rowwise() %>% mutate(per=paste0(visits,"\n",per))
-    
-    factor2Sankey  <- invoice %>% filter(CAR_YEAR<input$age) %>%
+
+    factor2Sankey  <- CLVInvoice %>% filter(CAR_YEAR<input$age) %>%
       group_by(visit) %>%
-      summarise(visits=n()) %>% 
+      summarise(visits=n()) %>%
       filter(visit<=6) %>% mutate(group="factor2Sankey") %>%
       arrange(desc(visits))  %>% mutate(per=paste0(round(visits/lag(visits)*100),'%'))
     # rowwise() %>% mutate(per=paste0(visits,"\n",per))
-    
-    
-    
+
+
+
     all <- rbind(factor1Sankey,factor2Sankey)
-    
+
     all <-  all %>% rowwise() %>% mutate(source=case_when(
       visit== 1 ~ "2018 Customers",
       visit== 2 & group=="factor1Sankey" ~ "Visit 1",
@@ -141,7 +154,7 @@ server <- function(input, output) {
       visit== 5 & group=="factor2Sankey" ~ "Visit 4 ",
       visit== 6 & group=="factor1Sankey" ~ "Visit 5",
       visit== 6 & group=="factor2Sankey" ~ "Visit 5 ",
-      TRUE ~ "GFY")) %>% 
+      TRUE ~ "GFY")) %>%
       mutate(target=case_when(
         source== "2018 Customers" & group=="factor2Sankey" ~ "Visit 1 ",
         source== "2018 Customers" & group=="factor1Sankey" ~ "Visit 1",
@@ -156,38 +169,46 @@ server <- function(input, output) {
         source== "Visit 5 " ~ "Visit 6",
         source== "Visit 5" ~ "Visit 6",
         TRUE ~ "GFY"))
-    
-    
+
+
     all$source= as.factor(all$source)
     all$target= as.factor(all$target)
     all
-    
+
     nodes <- data.frame(
-      name=c(as.character(all$source), 
+      name=c(as.character(all$source),
              as.character(all$target)) %>% unique()
     )
-    
+
     nodes
     nodes$group <- as.factor(c("a","b","b","b","b","b","c","c","c","c","c","d"))
-    
+
     # library(networkD3)
-    
+
     match(all$source, nodes$name)
-    all$IDsource <- match(all$source, nodes$name)-1 
+    all$IDsource <- match(all$source, nodes$name)-1
     all$IDtarget <- match(all$target, nodes$name)-1
     fontSize <- 16
-    nodeWidth <- 30
+    nodeWidth <- 40
     fontFamily <- "sans-serif"
     # Make the Network
+    # HTML(h3("This is my app!"),'<br/>')
+
     p <- sankeyNetwork(Links = all, Nodes = nodes,
                        Source = "IDsource", Target = "IDtarget",
                        Value = "visits", NodeID = "name", NodeGroup = 'group',
-                       sinksRight=FALSE, fontSize = fontSize, fontFamily = fontFamily, nodeWidth =nodeWidth, nodePadding = 20)
+                       sinksRight=FALSE, fontSize = fontSize, fontFamily = fontFamily, nodeWidth =nodeWidth, nodePadding = 40)
   })
   
-  output$three_R <- renderPlot({
-    print("HIU")
-  })
+  # output$three_R <- renderPlot({
+  #   HTML(
+  #     paste(
+  #       h3("This is my app!"),'<br/>',
+  #       h4("Download your data using the choose file button"),'<br/>',
+  #       h4("Thank you for using the app!")
+  #     )
+  #   )
+  # })
   
 }
 
