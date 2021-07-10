@@ -1,65 +1,82 @@
-
-# setwd("~/MSBA/shinyVTA")
-
+library(shinydashboard)
 library(shiny)
 library(shinythemes)
-# library(leaflet)
 library(networkD3)
-shinyUI(fluidPage(
-    theme = bslib::bs_theme(bootswatch = "flatly"),
+library(lubridate)
+library(tidyverse)
+ui <- dashboardPage(
+  dashboardHeader(),
+  dashboardSidebar(),
+  dashboardBody()
+)
+invoice <- read.csv("data/InvoiceSummary.csv")
 
-    # Application title
-    # navbarPage(
-    #     "Virginia Tire and Auto",   
-    #     tabPanel("CLV - Vehicle Age", "one"),
-    #     tabPanel("VTA Locations", "two"),
-    #     tabPanel("Customers", "three"),
-    #     tabPanel("Vehicles", "four"),
-    #     navbarMenu("Map",
-    #                tabPanel("Average Revenue", "four-a"),
-    #                tabPanel("Number of customers", "four-b"),
-    #                tabPanel("Number of VINs", "four-c")
-    #     )
-    # ),
-    titlePanel("Vehicle Age CLV"),
+invoice$CUST_CREATE_DATE <- lubridate::ymd(invoice$CUST_CREATE_DATE)
+dates=invoice %>% select(CUST_CREATE_DATE) %>% summarise(EarliestCust=min(CUST_CREATE_DATE,na.rm=TRUE), LatestCust=max(CUST_CREATE_DATE,na.rm=TRUE))
+#Dashboard header carrying the title of the dashboard
+header <- dashboardHeader(title = "Virginia Tire and Auto")  
+#Sidebar content of the dashboard
+sidebar <- dashboardSidebar(
+  sidebarMenu(
+    menuItem("Dashboard", tabName = "CLV", icon = icon("dashboard")),
+    menuItem("VTA Location Summary", icon = icon("send",lib='glyphicon'), 
+             href = "https://rpubs.com/greermp/Regard_by_location"),
+    sliderInput("age",
+                "Vehicle Age Segment:",
+                min = 1995,
+                max = 2020,
+                value = 2010),
+    h3("Stuff"),
+    numericInput('marketing', 'Marketing per Customer/year ($)', 76, min = 1, max = 9),
+    numericInput('margin', 'Sales Margin - Parts&Labor (%)', 64, min = 1, max = 99),
+    numericInput('discount', 'Discount Rate (%)', 10, min = 1, max = 50),
+    dateRangeInput("dates",'Customer Creation Date Range (CLV)', min=dates$EarliestCust, max=dates$LatestCust,
+                   start="2018-01-01", end="2018-12-31"),
+    hr()
+                   
+  )# label = h3("Customer Cohort")
+)
 
-    sidebarLayout(
-        sidebarPanel(
-            sliderInput("age",
-                        "Vehicle Age Segment:",
-                        min = 1995,
-                        max = 2020,
-                        value = 2010),
-            numericInput('marketing', 'Marketing per Customer/year ($)', 76, min = 1, max = 9),
-            numericInput('margin', 'Sales Margin - Parts&Labor (%)', 64, min = 1, max = 99),
-            numericInput('discount', 'Discount Rate (%)', 10, min = 1, max = 50)
-            
-        ),
 
-        # Show a plot of the generated distribution
-        
-        mainPanel(
-            tabsetPanel(
-                tabPanel("Customer Lifetime Value/Rev per Visit",
-                    fluidRow(
-                        plotOutput("distPlot")
-                    ),
-                    fluidRow(
-                        plotOutput("revPlot"),
-                    ),
-                ),
-                tabPanel("Customer Return Rate",
-                     fluidRow(
-                     sankeyNetworkOutput("plot")
-                    )
-                )#,
-                # tabPanel("map",
-                #          fluidRow(
-                #              leafletOutput("map"),
-                #              p()
-                #          )
-                # )
-            )
-        )
-    )
-))
+frow1 <- fluidRow(
+  valueBoxOutput("value1")
+  ,valueBoxOutput("value2")
+  ,valueBoxOutput("value3")
+)
+frow2 <- fluidRow( 
+  box(
+    title = "Average Revenue per Visit"
+    ,status = "primary"
+    ,solidHeader = TRUE 
+    ,collapsible = TRUE 
+    ,plotOutput("two_L", height = "300px")
+  )
+  ,box(
+    title = "CLV per Customer Segment"
+    ,status = "primary"
+    ,solidHeader = TRUE 
+    ,collapsible = TRUE 
+    ,plotOutput("two_R", height = "300px")
+  ) 
+)
+frow3 <- fluidRow(
+                  column(12,
+                         box(width = 12,
+    title="Customer Return Rate by Segment",
+    sankeyNetworkOutput("three_L")))
+)
+
+
+# frow4 <- fluidRow(
+#   title="Customer Return Rate by Segment",
+#   # box(  
+#   ("three_R")
+#   # ,plotOutput("three_L", height = "300px")
+#   # )
+# )
+# combine the two fluid rows to make the body
+body <- dashboardBody(frow1, frow2)
+body <- dashboardBody(frow1, frow2, frow3)
+
+#completing the ui part with dashboardPage
+ui <- dashboardPage(title = 'VTA Analysis', header, sidebar, body, skin='green')
