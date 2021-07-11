@@ -1,3 +1,5 @@
 webpage/
 rsconnect/
 old/
+*.csv
+.Rhistory

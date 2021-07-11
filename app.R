@@ -7,92 +7,134 @@ library(tidyverse)
 library(scales)
 library(ggthemes)
 library(RColorBrewer)
+library(sf)
 library(leaflet)
 library(fontawesome)
+library(tigris)
 palette="Dark2"
+# setwd("~/MSBA/shinyVTA")
+invoice <- read.csv("data/InvoiceSummary.csv")
+zipcodes2=st_read("mapdata/zipcodes.shp")
+zipcode_totals <- read.csv("mapdata/zipcodetotals.csv")
+# input=tibble(age=2010,
+#              marketing=76,
+#              margin=64,
+#              discount=10,
+#              dates=c("2018-01-01", "2018-12-31")
+# )
+
+invoice$CUST_CREATE_DATE <- lubridate::ymd(invoice$CUST_CREATE_DATE)
+dates=invoice %>% select(CUST_CREATE_DATE) %>% summarise(EarliestCust=min(CUST_CREATE_DATE,na.rm=TRUE), LatestCust=max(CUST_CREATE_DATE,na.rm=TRUE))
+
 My_Theme = theme(
     axis.title.x = element_text(size = 16),
     axis.text.x = element_text(size = 14),
     axis.title.y = element_text(size = 16))
 
-# setwd("~/MSBA/shinyVTA")
-invoice <- read.csv("data/InvoiceSummary.csv")
+ui=navbarPage(title="Virginia Tire and Auto", theme = shinytheme("flatly"),
+fluid = TRUE,
+collapsible = TRUE,
 
-ui <- dashboardPage(
-    dashboardHeader(),
-    dashboardSidebar(),
-    dashboardBody()
-)
-
-invoice$CUST_CREATE_DATE <- lubridate::ymd(invoice$CUST_CREATE_DATE)
-dates=invoice %>% select(CUST_CREATE_DATE) %>% summarise(EarliestCust=min(CUST_CREATE_DATE,na.rm=TRUE), LatestCust=max(CUST_CREATE_DATE,na.rm=TRUE))
-#Dashboard header carrying the title of the dashboard
-header <- dashboardHeader(title = "Virginia Tire and Auto")  
-#Sidebar content of the dashboard
-sidebar <- dashboardSidebar(
-    sidebarMenu(
-        menuItem("Dashboard", tabName = "CLV", icon = icon("dashboard")),
-        menuItem("VTA Location Summary", icon = icon("send",lib='glyphicon'), 
-                 href = "https://rpubs.com/greermp/Regard_by_location"),
-        sliderInput("age",
-                    "Vehicle Age Segment:",
-                    min = 1995,
-                    max = 2020,
-                    value = 2010),
-        h3("Stuff"),
-        numericInput('marketing', 'Marketing per Customer/year ($)', 76, min = 1, max = 9),
-        numericInput('margin', 'Sales Margin - Parts&Labor (%)', 64, min = 1, max = 99),
-        numericInput('discount', 'Discount Rate (%)', 10, min = 1, max = 50),
-        dateRangeInput("dates",'Customer Creation Date Range (CLV)', min=dates$EarliestCust, max=dates$LatestCust,
-                       start="2018-01-01", end="2018-12-31"),
-        hr()
-        
-    )# label = h3("Customer Cohort")
-)
-
-
-frow1 <- fluidRow(
-    valueBoxOutput("value1")
-    ,valueBoxOutput("value2")
-    ,valueBoxOutput("value3")
-)
-frow2 <- fluidRow( 
-    box(
-        title = "Average Revenue per Visit"
-        ,status = "primary"
-        ,solidHeader = TRUE 
-        ,collapsible = TRUE 
-        ,plotOutput("two_L", height = "300px")
+tabPanel("Home",
+     sidebarLayout(sidebarPanel(icon("dashboard"),width = 3,
+         sliderInput("age",
+                     "Vehicle Age Segment:",
+                     min = 1995,
+                     max = 2020,
+                     value = 2010),
+         h3("Stuff"),
+         numericInput('marketing', 'Marketing per Customer/year ($)', 76, min = 1, max = 9),
+         numericInput('margin', 'Sales Margin - Parts&Labor (%)', 64, min = 1, max = 99),
+         numericInput('discount', 'Discount Rate (%)', 10, min = 1, max = 50),
+         dateRangeInput("dates",'Customer Creation Date Range (CLV)', min=dates$EarliestCust, max=dates$LatestCust,
+                        start="2018-01-01", end="2018-12-31"),
+                 hr()
+         ),
+        mainPanel(
+            tags$style(".small-box.bg-yellow { background-color: #33B44A !important; color: #000000 !important; }"),
+        fluidRow(
+             valueBoxOutput("value1")
+             ,valueBoxOutput("value2")
+             ,valueBoxOutput("value3")
+         ),
+         fluidRow(
+             box(
+                 title = "Average Revenue per Visit"
+                 ,status = "primary"
+                 ,solidHeader = TRUE
+                 ,collapsible = TRUE
+                 ,plotOutput("two_L", height = "300px")
+             )
+             ,box(
+                 title = "CLV per Customer Segment"
+                 ,status = "primary"
+                 ,solidHeader = TRUE
+                 ,collapsible = TRUE
+                 ,plotOutput("two_R", height = "300px")
+             )
+         ),
+        hr(),
+         fluidRow(
+             column(12,
+                    box(width = 12,
+                        title="Customer Return Rate by Segment",
+                        sankeyNetworkOutput("three_L")))
+         )
+        )# End main panel
+        )# End sidebar panel
+),# End Tab 1
+#################### TAB 2 ###########################
+navbarMenu(title="Data Viz",
+    tabPanel("Customer Data",
+             h1("Hello")),
+    tabPanel("Vehicle Data",
+             h1("GFY"))
+),
+#################### TAB 3 ###########################
+tabPanel("Map",
+         # sidebarLayout(sidebarPanel("BadassMap",
+         #                            width = 3,
+         #                           
+         #                            hr()
+         # ),
+         mainPanel(
+             fluidRow(
+                 box(title="Hello"),
+                 tags$style(type = "text/css", "#mymap {height: calc(100vh - 80px) !important;}"),
+                 leafletOutput("mymap")
+             )
+             # fluidRow(
+             #     box(
+             #         title = "Average Revenue per Visit"
+             #         ,status = "primary"
+             #         ,solidHeader = TRUE
+             #         ,collapsible = TRUE
+             #         ,plotOutput("two_L", height = "300px")
+             #     )
+             #     ,box(
+             #         title = "CLV per Customer Segment"
+             #         ,status = "primary"
+             #         ,solidHeader = TRUE
+             #         ,collapsible = TRUE
+             #         ,plotOutput("two_R", height = "300px")
+             #     )
+             # ),
+             # 
+             # fluidRow(
+             #     column(12,
+             #            box(width = 12,
+             #                title="Customer Return Rate by Segment",
+             #                sankeyNetworkOutput("three_L")))
+             # )
+         )# End main panel
+         # )# End sidebar panel
     )
-    ,box(
-        title = "CLV per Customer Segment"
-        ,status = "primary"
-        ,solidHeader = TRUE 
-        ,collapsible = TRUE 
-        ,plotOutput("two_R", height = "300px")
-    ) 
-)
-frow3 <- fluidRow(
-    column(12,
-           box(width = 12,
-               title="Customer Return Rate by Segment",
-               sankeyNetworkOutput("three_L")))
 )
 
 
-# frow4 <- fluidRow(
-#   title="Customer Return Rate by Segment",
-#   # box(  
-#   ("three_R")
-#   # ,plotOutput("three_L", height = "300px")
-#   # )
-# )
-# combine the two fluid rows to make the body
-body <- dashboardBody(frow1, frow2)
-body <- dashboardBody(frow1, frow2, frow3)
 
-#completing the ui part with dashboardPage
-ui <- dashboardPage(title = 'VTA Analysis', header, sidebar, body, skin='green')
+
+
 #######################################################################################################################################
 #######################################################################################################################################
 #######################################################################################################################################
@@ -102,11 +144,7 @@ total.revenue <- as.numeric(round(invoice %>% summarise(sum(TOTAL_SALE_AMOUNT)),
 total.customers <- as.numeric(round(invoice %>% group_by(CUSTOMER_NUMBER) %>% select(CUSTOMER_NUMBER) %>% unique() %>% nrow(), 2))
 customer.2018 <- as.numeric(round(invoice %>% filter(createYear == 2018) %>% group_by(CUSTOMER_NUMBER) %>% select(CUSTOMER_NUMBER) %>% unique() %>% nrow(), 2))
 
-# input=tibble(age=2010,
-#              marketing=76,
-#              margin=64,
-#              discount=10
-# )
+
 
 # create the server functions for the dashboard  
 server <- function(input, output) { 
@@ -115,17 +153,17 @@ server <- function(input, output) {
     #creating the valueBoxOutput content
     output$value1 <- renderValueBox({
         valueBox(
-            paste0('$',formatC(as.numeric(total.revenue/1000000)))
+            paste0('$',formatC(as.numeric(total.revenue/1000000))," MM")
             ,'Total Reveneue'
             ,icon = icon("money-bill-wave",lib='font-awesome')
-            ,color = "blue")  
+            ,color = "yellow")  
     })
     output$value2 <- renderValueBox({ 
         valueBox(
             formatC(as.numeric(total.customers), format="f", big.mark=',', drop0trailing = TRUE)
             ,'Total Unique Customers'
             ,icon = icon("oil-can",lib='font-awesome')
-            ,color = "green")  
+            ,color = "yellow")  
     })
     output$value3 <- renderValueBox({
         valueBox(
@@ -288,15 +326,48 @@ server <- function(input, output) {
                            sinksRight=FALSE, fontSize = fontSize, fontFamily = fontFamily, nodeWidth =nodeWidth, nodePadding = 40)
     })
     
-    # output$three_R <- renderPlot({
-    #   HTML(
-    #     paste(
-    #       h3("This is my app!"),'<br/>',
-    #       h4("Download your data using the choose file button"),'<br/>',
-    #       h4("Thank you for using the app!")
-    #     )
-    #   )
-    # })
+    output$mymap <- renderLeaflet({
+
+        # Geojoin totals with zipcodes
+        zipcodes_w_totals <- geo_join(zipcodes2, 
+                                      zipcode_totals, 
+                                      by_sp = "GEOID10", 
+                                      by_df = "Zip.Code",
+                                      how = "left")
+        # Palette
+        # bins <- c(0, 100, 200, 500, 1000, Inf)
+        bins <- c(0, 1e3, 1e4, 1e5, 25e4, 50e4, 75e4, 1e6,2e6,Inf)
+        pal <- colorBin("YlOrRd", domain = zipcode_totals$zipcode_totals, bins = bins)
+        
+        
+        # Leaflet map
+        map <- zipcodes_w_totals %>% 
+            leaflet %>% 
+            # add base map
+            addProviderTiles("CartoDB") %>% 
+            # add zip codes
+            addPolygons(fillColor = ~pal(zipcode_totals),
+                        weight = 0.5,
+                        opacity = 1,
+                        color = "black",
+                        dashArray = "1",
+                        fillOpacity = 0.5,
+                        highlight = highlightOptions(weight = 2,
+                                                     color = "#666",
+                                                     dashArray = "",
+                                                     fillOpacity = 0.4,
+                                                     bringToFront = TRUE)) %>% 
+            setView(lng = -77.8, lat = 38.7,  zoom = 8) %>% 
+            # add legend
+            addLegend(pal = pal, 
+                      values = ~zipcode_totals, 
+                      opacity = 0.7, 
+                      title = "Sum Invoices by Zip",
+                      position = "topright")
+        
+        
+        map
+    })
     
 }
 
