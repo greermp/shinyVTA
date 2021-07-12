@@ -98,7 +98,7 @@ server <- function(input, output, session) {
                   round_any(themax*.80, 100000),
                   round_any(themax+100000, 100000))
         
-        bins <- unique(bins)
+        bins <- bins %>% unique()
         
         pal <- colorBin("YlOrRd", domain = zipcode_totals$Revenue, bins = bins)
         

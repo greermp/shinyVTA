@@ -45,8 +45,8 @@ invoice$Zip.Code <- as.factor(invoice$Zip.Code)
 ui=navbarPage(title="Virginia Tire and Auto", theme = shinytheme("flatly"),
 fluid = TRUE,
 collapsible = TRUE,
-
-tabPanel("Home",
+navbarMenu("CLV",
+tabPanel("Vehicle Age",
      sidebarLayout(sidebarPanel(icon("dashboard"),width = 3,
          sliderInput("age",
                      "Vehicle Age Segment:",
@@ -95,6 +95,16 @@ tabPanel("Home",
          # )
         # )# End main panel
         )# End sidebar panel
+),
+tabPanel("MyCar Member",
+         # fluidRow(
+         h3("Coming Soon")
+)   
+,
+tabPanel("City",
+         # fluidRow(
+         h3("Coming Soon")
+)   
 ),# End Tab 1
 #################### TAB 2 ###########################
 navbarMenu(title="Data Viz",
@@ -118,6 +128,10 @@ navbarMenu(title="Data Viz",
              box(
                  title="Historical Margins",
                  plotOutput("margins")
+             ),
+             box(
+                 title="New Customers/Year",
+                 plotOutput("customers")
              )
              ),
              fluidRow(
@@ -494,7 +508,7 @@ output$margins <- renderPlot({
 
 
 output$services <- renderPlot({
-    marginByYr=read.csv("data/marginbyclass.csv")
+    marginByClass=read.csv("data/marginbyclass.csv")
     serviceMargins<- marginByClass %>%  filter( str_detect(CLASS_Desc,"Tire|tire", negate=TRUE))
     serviceMargins <- serviceMargins %>% select(CLASS_Desc, Rev, Profit, margin)
     write.csv(serviceMargins, 'serviceMargins.csv')
@@ -518,7 +532,7 @@ output$services <- renderPlot({
 })
 
 output$tires <- renderPlot({
-    marginByYr=read.csv("data/marginbyclass.csv")
+    marginByClass=read.csv("data/marginbyclass.csv")
     tireMargins <- marginByClass %>%  filter(str_detect(CLASS_Desc,"Tire|tire"))
     tireMargins <- tireMargins %>% select(CLASS_Desc, Rev, Profit, margin)
     write.csv(tireMargins, 'tireMargins.csv')
@@ -562,6 +576,20 @@ ggplot(datePlot,aes(x=YearMonth, y=Rev, shape=year, color=year)) + geom_point(sh
     labs(title="Revenue Over Time", y="Revenue", x="")
 })
 
+
+output$customers <- renderPlot({
+    
+inv=invoice
+inv$VIN_NUMBER[inv$VIN_NUMBER=='NULL'] = NA
+inv <- inv %>% drop_na(CUST_CREATE_DATE, VIN_NUMBER)
+inv %>% group_by(createYear) %>% summarise(Reveneue=sum(Total.Line.Revenue)) %>% 
+    ggplot(aes(x=createYear, y=Reveneue)) + geom_col()
+
+inv %>% group_by(createYear) %>% select(CUSTOMER_NUMBER) %>% unique() %>%  summarise(newCustomers=n()) %>% 
+    ggplot(aes(x=createYear, y=newCustomers)) + geom_col() +
+    scale_y_continuous(labels = label_comma()) +
+    labs(title="New Customers per Year", y="", x="")
+})
 
 }
 # Run the application 
