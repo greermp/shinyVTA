@@ -13,9 +13,11 @@ library(fontawesome)
 library(tigris)
 palette="Dark2"
 # setwd("~/MSBA/shinyVTA")
-invoice <- read.csv("data/InvoiceSummary.csv")
+
+invoice<- read.csv("data/VTA_Invoice_all 7.8.2021.csv")
+vtaLocations=read.csv("mapdata/vtalocations.csv")
 zipcodes2=st_read("mapdata/zipcodes.shp")
-zipcode_totals <- read.csv("mapdata/zipcodetotals.csv")
+
 # input=tibble(age=2010,
 #              marketing=76,
 #              margin=64,
@@ -25,11 +27,20 @@ zipcode_totals <- read.csv("mapdata/zipcodetotals.csv")
 
 invoice$CUST_CREATE_DATE <- lubridate::ymd(invoice$CUST_CREATE_DATE)
 dates=invoice %>% select(CUST_CREATE_DATE) %>% summarise(EarliestCust=min(CUST_CREATE_DATE,na.rm=TRUE), LatestCust=max(CUST_CREATE_DATE,na.rm=TRUE))
+round_any = function(x, accuracy, f=round){f(x/ accuracy) * accuracy}
 
 My_Theme = theme(
     axis.title.x = element_text(size = 16),
     axis.text.x = element_text(size = 14),
     axis.title.y = element_text(size = 16))
+
+
+invDates=invoice %>% select(INVOICE_DATE) %>% summarise(earliestINV=min(INVOICE_DATE,na.rm=TRUE), 
+                                                        latestINV=max(INVOICE_DATE,na.rm=TRUE))
+
+invoice <- invoice %>%  mutate(Zip.Code = str_sub(Zip.Code, start=1, end=5))
+
+invoice$Zip.Code <- as.factor(invoice$Zip.Code)
 
 ui=navbarPage(title="Virginia Tire and Auto", theme = shinytheme("flatly"),
 fluid = TRUE,
@@ -41,7 +52,8 @@ tabPanel("Home",
                      "Vehicle Age Segment:",
                      min = 1995,
                      max = 2020,
-                     value = 2010),
+                     value = 2010,
+                     sep = ""),
          h3("Stuff"),
          numericInput('marketing', 'Marketing per Customer/year ($)', 76, min = 1, max = 9),
          numericInput('margin', 'Sales Margin - Parts&Labor (%)', 64, min = 1, max = 99),
@@ -51,7 +63,7 @@ tabPanel("Home",
                  hr()
          ),
         mainPanel(
-            tags$style(".small-box.bg-yellow { background-color: #33B44A !important; color: #000000 !important; }"),
+            tags$style(".small-box.bg-yellow {  border-radius: 10px; background-color: #33B44A !important; color: #000000 !important; }"),
         fluidRow(
              valueBoxOutput("value1")
              ,valueBoxOutput("value2")
@@ -74,62 +86,69 @@ tabPanel("Home",
              )
          ),
         hr(),
-         fluidRow(
+        br(),
+         # fluidRow(
              column(12,
-                    box(width = 12,
+                    # box(width = 12,
                         title="Customer Return Rate by Segment",
-                        sankeyNetworkOutput("three_L")))
-         )
-        )# End main panel
+                        sankeyNetworkOutput("three_L", width = "100%")))
+         # )
+        # )# End main panel
         )# End sidebar panel
 ),# End Tab 1
 #################### TAB 2 ###########################
 navbarMenu(title="Data Viz",
     tabPanel("Customer Data",
-             h1("Hello")),
-    tabPanel("Vehicle Data",
-             h1("GFY"))
+             # h1("Hello"),
+             
+        fluidRow(
+            # plotOutput("custPlot2")
+            splitLayout(cellWidths = c("50%", "50%"),
+            plotOutput("custPlot1",  height = "300px"), plotOutput("custPlot2", height = "300px"))
+        ),
+        hr(),
+        br(),
+        column(width = 8, offset=2,
+            plotOutput("revenue")
+        )
+    ),
+    tabPanel("Margin Data",
+             # h1("Margin Data"),
+             fluidRow(
+             box(
+                 title="Historical Margins",
+                 plotOutput("margins")
+             )
+             ),
+             fluidRow(
+                 box(
+                     title="Service Margins",
+                     plotOutput("services")
+                     
+                 ),
+                 box(
+                     title="Tire Margins",
+                     plotOutput("tires")
+                 )
+             )
+             )
 ),
 #################### TAB 3 ###########################
 tabPanel("Map",
-         # sidebarLayout(sidebarPanel("BadassMap",
-         #                            width = 3,
-         #                           
-         #                            hr()
-         # ),
-         mainPanel(
-             fluidRow(
-                 box(title="Hello"),
-                 tags$style(type = "text/css", "#mymap {height: calc(100vh - 80px) !important;}"),
-                 leafletOutput("mymap")
-             )
-             # fluidRow(
-             #     box(
-             #         title = "Average Revenue per Visit"
-             #         ,status = "primary"
-             #         ,solidHeader = TRUE
-             #         ,collapsible = TRUE
-             #         ,plotOutput("two_L", height = "300px")
-             #     )
-             #     ,box(
-             #         title = "CLV per Customer Segment"
-             #         ,status = "primary"
-             #         ,solidHeader = TRUE
-             #         ,collapsible = TRUE
-             #         ,plotOutput("two_R", height = "300px")
-             #     )
-             # ),
-             # 
-             # fluidRow(
-             #     column(12,
-             #            box(width = 12,
-             #                title="Customer Return Rate by Segment",
-             #                sankeyNetworkOutput("three_L")))
-             # )
+         textOutput("missing"),
+         # p("Missing", paste0(as.character(per)), "Zipcodes!"),
+         dateRangeInput("datesMap",'Invoice Date Range', min=invDates$earliestINV, max=invDates$latestINV,
+                        start="2018-12-01", end="2018-12-31"),
+         leafletOutput("mymap"),
+         br(),
+         plotOutput("bar"),
+        
+         p()
+             
          )# End main panel
          # )# End sidebar panel
+    
     )
-)
 
 
 
@@ -140,7 +159,7 @@ tabPanel("Map",
 #######################################################################################################################################
 #######################################################################################################################################
 
-total.revenue <- as.numeric(round(invoice %>% summarise(sum(TOTAL_SALE_AMOUNT)), 2))
+total.revenue <- as.numeric(round(invoice %>% summarise(sum(Total.Line.Revenue)), 2))
 total.customers <- as.numeric(round(invoice %>% group_by(CUSTOMER_NUMBER) %>% select(CUSTOMER_NUMBER) %>% unique() %>% nrow(), 2))
 customer.2018 <- as.numeric(round(invoice %>% filter(createYear == 2018) %>% group_by(CUSTOMER_NUMBER) %>% select(CUSTOMER_NUMBER) %>% unique() %>% nrow(), 2))
 
@@ -179,7 +198,7 @@ server <- function(input, output) {
             mutate(factor=case_when(
                 CAR_YEAR>=input$age ~ paste0(input$age,' or Newer'),
                 TRUE ~ paste0('Older than ',input$age)
-            )) %>% group_by(factor) %>%  summarise(AverageInvoice=mean(TOTAL_SALE_AMOUNT))
+            )) %>% group_by(factor) %>%  summarise(AverageInvoice=mean(Total.Line.Revenue))
         
         vehage %>% ggplot(aes(x=factor, y=AverageInvoice, fill=factor)) +
             geom_col() +
@@ -199,8 +218,6 @@ server <- function(input, output) {
         # print(input$dates)
         # print(input$age)
         
-        
-        print("4")
         vehage <- CLVInvoice %>% 
             mutate(factor=case_when(
                 CAR_YEAR>=input$age ~ paste0(input$age, ' or Newer'),
@@ -214,9 +231,9 @@ server <- function(input, output) {
         print(marketingpp)
         print(discount)
         print(marginPercent)
-        vehage %>% group_by(factor, visit) %>% summarise(AvgVisitRev=mean(TOTAL_SALE_AMOUNT), customers=n()) %>%  arrange(desc(visit))
+        vehage %>% group_by(factor, visit) %>% summarise(AvgVisitRev=mean(Total.Line.Revenue), customers=n()) %>%  arrange(desc(visit))
         
-        clvAge <- vehage %>% group_by(factor, visit) %>% summarise(AvgVisitRev=mean(TOTAL_SALE_AMOUNT), customers=n()) %>% 
+        clvAge <- vehage %>% group_by(factor, visit) %>% summarise(AvgVisitRev=mean(Total.Line.Revenue), customers=n()) %>% 
             mutate(Attrition=customers/lag(customers)) %>% mutate(Attrition=case_when(is.na(Attrition)~1, TRUE ~ Attrition)) %>% 
             mutate(AttrMult=Attrition*lag(Attrition)) %>% 
             mutate(AttrMult=case_when(is.na(AttrMult)~1, TRUE ~ AttrMult)) %>% 
@@ -240,7 +257,7 @@ server <- function(input, output) {
                                                     big.mark = ",", decimal.mark = ".")) +
             geom_text(nudge_y = 5,aes(x=factor, y=CLV, label=paste0(round(CLV,0),'$'))) +
             labs(x="", title="", y="USD") + 
-            theme_tufte() + scale_fill_brewer(palette = palette)
+            theme_tufte() + scale_fill_brewer(palette = palette) + My_Theme
     })
     print("5")
     output$three_L <- renderSankeyNetwork({
@@ -269,42 +286,50 @@ server <- function(input, output) {
         all <- rbind(factor1Sankey,factor2Sankey)
         
         all <-  all %>% rowwise() %>% mutate(source=case_when(
-            visit== 1 ~ "2018 Customers",
-            visit== 2 & group=="factor1Sankey" ~ "Visit 1",
-            visit== 2 & group=="factor2Sankey" ~ "Visit 1 ",
-            visit== 3 & group=="factor1Sankey" ~ "Visit 2",
-            visit== 3 & group=="factor2Sankey" ~ "Visit 2 ",
-            visit== 4 & group=="factor1Sankey" ~ "Visit 3",
-            visit== 4 & group=="factor2Sankey" ~ "Visit 3 ",
-            visit== 5 & group=="factor1Sankey" ~ "Visit 4",
-            visit== 5 & group=="factor2Sankey" ~ "Visit 4 ",
-            visit== 6 & group=="factor1Sankey" ~ "Visit 5",
-            visit== 6 & group=="factor2Sankey" ~ "Visit 5 ",
+            visit== 1 ~ "2018Customers",
+            visit== 2 & group=="factor1Sankey" ~ "Visit~1",
+            visit== 2 & group=="factor2Sankey" ~ "Visit-1",
+            visit== 3 & group=="factor1Sankey" ~ "Visit~2",
+            visit== 3 & group=="factor2Sankey" ~ "Visit-2",
+            visit== 4 & group=="factor1Sankey" ~ "Visit~3",
+            visit== 4 & group=="factor2Sankey" ~ "Visit-3",
+            visit== 5 & group=="factor1Sankey" ~ "Visit~4",
+            visit== 5 & group=="factor2Sankey" ~ "Visit-4",
+            visit== 6 & group=="factor1Sankey" ~ "Visit~5",
+            visit== 6 & group=="factor2Sankey" ~ "Visit-5",
             TRUE ~ "GFY")) %>%
             mutate(target=case_when(
-                source== "2018 Customers" & group=="factor2Sankey" ~ "Visit 1 ",
-                source== "2018 Customers" & group=="factor1Sankey" ~ "Visit 1",
-                source== "Visit 1 " ~ "Visit 2 ",
-                source== "Visit 1" ~ "Visit 2",
-                source== "Visit 2 " ~ "Visit 3 ",
-                source== "Visit 2" ~ "Visit 3",
-                source== "Visit 3 " ~ "Visit 4 ",
-                source== "Visit 3" ~ "Visit 4",
-                source== "Visit 4 " ~ "Visit 5 ",
-                source== "Visit 4" ~ "Visit 5",
-                source== "Visit 5 " ~ "Visit 6",
-                source== "Visit 5" ~ "Visit 6",
+                source== "2018Customers" & group=="factor2Sankey" ~ "Visit-1",
+                source== "2018Customers" & group=="factor1Sankey" ~ "Visit~1",
+                source== "Visit-1" ~ "Visit-2",
+                source== "Visit~1" ~ "Visit~2",
+                source== "Visit-2" ~ "Visit-3",
+                source== "Visit~2" ~ "Visit~3",
+                source== "Visit-3" ~ "Visit-4",
+                source== "Visit~3" ~ "Visit~4",
+                source== "Visit-4" ~ "Visit-5",
+                source== "Visit~4" ~ "Visit~5",
+                source== "Visit-5" ~ "Visit-6",
+                source== "Visit~5" ~ "Visit-6",
                 TRUE ~ "GFY"))
-        
+        # .domain(['2018Customers','Visit-1','Visit-2','Visit-3','Visit-4','Visit-5','Visit-6','Visit~1','Visit~2','Visit~3','Visit~4','Visit~5'])
+        # .range(['#1b9e77','#000','#000','#1b9e77','#1b9e77','#1b9e77','#d95f02','#d95f02','#d95f02','#d95f02','#d95f02','#000']);"
+
+        color_scale <- 
+            "d3.scaleOrdinal()
+        .range(['#808080','#1b9e77','#d95f02']);"
         
         all$source= as.factor(all$source)
         all$target= as.factor(all$target)
         all
         
+        
+        
         nodes <- data.frame(
             name=c(as.character(all$source),
                    as.character(all$target)) %>% unique()
         )
+        
         
         nodes
         nodes$group <- as.factor(c("a","b","b","b","b","b","c","c","c","c","c","d"))
@@ -322,61 +347,222 @@ server <- function(input, output) {
         
         p <- sankeyNetwork(Links = all, Nodes = nodes,
                            Source = "IDsource", Target = "IDtarget",
-                           Value = "visits", NodeID = "name", NodeGroup = 'group',
-                           sinksRight=FALSE, fontSize = fontSize, fontFamily = fontFamily, nodeWidth =nodeWidth, nodePadding = 40)
+                           Value = "visits", NodeID = "name", NodeGroup = 'group', width=1000,
+                           sinksRight=FALSE, fontSize = fontSize, fontFamily = fontFamily, nodeWidth =nodeWidth, nodePadding = 40,
+                           colourScale = color_scale)
+    p
     })
-    
+    output$missing <- renderText({
+        totals <- invoice %>% filter(INVOICE_DATE>= input$datesMap[1] &
+                                         INVOICE_DATE<= input$datesMap[2])
+        total <- totals %>% nrow()
+        missing <- totals %>%  filter(nchar(as.character(Zip.Code)) == 5) %>% nrow()
+        per=label_percent()(missing/total)
+        # paste(per, "of ", total, "invoices are missing zipcode data")
+        paste(per, "of", label_comma()(total), "invoices are missing zipcode data for this time period")
+        
+    })
     output$mymap <- renderLeaflet({
-
+        zipcode_totals <- invoice %>% filter(INVOICE_DATE>= input$datesMap[1] &
+                                                 INVOICE_DATE<= input$datesMap[2]) %>% 
+            group_by(Zip.Code) %>% summarise(Revenue=sum(Total.Line.Revenue))
+        
         # Geojoin totals with zipcodes
         zipcodes_w_totals <- geo_join(zipcodes2, 
                                       zipcode_totals, 
                                       by_sp = "GEOID10", 
                                       by_df = "Zip.Code",
                                       how = "left")
-        # Palette
-        # bins <- c(0, 100, 200, 500, 1000, Inf)
-        bins <- c(0, 1e3, 1e4, 1e5, 25e4, 50e4, 75e4, 1e6,2e6,Inf)
-        pal <- colorBin("YlOrRd", domain = zipcode_totals$zipcode_totals, bins = bins)
+        
+        themax=max(zipcodes_w_totals$Revenue, na.rm = TRUE)
+        bins <- c(0, 
+                  # round(themax*.20, 0),
+                  # round(themax*.30, 0),
+                  round_any(themax*.10, 100000, floor),
+                  round_any(themax*.20, 100000),
+                  round_any(themax*.30, 100000),
+                  round_any(themax*.40, 100000),
+                  round_any(themax*.60, 100000),
+                  round_any(themax*.80, 100000),
+                  round_any(themax*1.1, 100000))
+        
+        bins <- unique(bins)
+        
+        pal <- colorBin("YlOrRd", domain = zipcode_totals$Revenue, bins = bins)
         
         
         # Leaflet map
         map <- zipcodes_w_totals %>% 
-            leaflet %>% 
+            leaflet %>%
             # add base map
             addProviderTiles("CartoDB") %>% 
             # add zip codes
-            addPolygons(fillColor = ~pal(zipcode_totals),
+            addPolygons(fillColor = ~pal(Revenue),
                         weight = 0.5,
                         opacity = 1,
                         color = "black",
                         dashArray = "1",
                         fillOpacity = 0.5,
+                        popup = paste0("Zip: ",zipcodes_w_totals$GEOID10, "<br>", "Revenue: ",
+                                       comma( round(zipcodes_w_totals$Revenue,0),prefix = '$' )), 
                         highlight = highlightOptions(weight = 2,
                                                      color = "#666",
                                                      dashArray = "",
                                                      fillOpacity = 0.4,
                                                      bringToFront = TRUE)) %>% 
-            setView(lng = -77.8, lat = 38.7,  zoom = 8) %>% 
+            setView(lng = -77.5, lat = 38.7,  zoom = 9) %>% 
             # add legend
             addLegend(pal = pal, 
-                      values = ~zipcode_totals, 
+                      values = ~Revenue, 
                       opacity = 0.7, 
-                      title = "Sum Invoices by Zip",
-                      position = "topright")
+                      title = "Invoices by Zip",
+                      position = "topright") %>% 
+            addMarkers(lng = ~vtaLocations$Long, lat = ~vtaLocations$Lat, label = vtaLocations$Location)
         
         
         map
     })
     
+    output$bar <- renderPlot({
+        
+        
+        p <- invoice %>%
+            filter(INVOICE_DATE>= input$datesMap[1] &
+                        INVOICE_DATE<= input$datesMap[2]) %>% 
+            group_by(Store.ID) %>% 
+            summarise(Revenue=sum(Total.Line.Revenue), Profit=sum(Revenue.Less.Cost)) %>% 
+            ggplot() + geom_col(aes(x=reorder(Store.ID,Revenue), y=Revenue)) +
+            coord_flip() +
+            labs(x="", title=paste("Store Revenues from", input$datesMap[1], "to", input$datesMap[2])) +
+            theme_minimal() +
+            scale_y_continuous(labels = label_comma(prefix = '$'), breaks=pretty_breaks())+ My_Theme
+        
+        p
+    })
+ 
+
+
+
+output$custPlot1 <- renderPlot({
+    print("I'm here in 1")
+    df = invoice %>% filter(! is.na(NPS)) %>% group_by(NPS) %>% 
+        summarise(Rev = mean(Total.Line.Revenue)) 
+        
+    ggplot(df, aes(x=NPS, y=Rev)) +
+        geom_col() +
+        scale_y_continuous(labels = label_comma(prefix = "$")) +
+        scale_x_continuous(breaks=pretty_breaks(9)) +
+        theme_tufte() +
+        labs(y="", title="Mean Revenue per NPS")
+    # p
+})
+
+output$custPlot2 <- renderPlot({
+    print("I'm here in 2")
+    df = invoice  %>% group_by(BrandSum) %>% 
+        summarise(Rev = sum(Total.Line.Revenue), count=n()) %>% 
+        arrange(desc(Rev)) %>% slice_max(Rev, n=10) 
+    ggplot(df, aes(reorder(x=BrandSum, -Rev), y=Rev, fill=count)) +
+        geom_col() +
+        scale_y_continuous(labels = label_comma(prefix = "$")) +
+        # scale_x_continuous(breaks=pretty_breaks(9)) +
+        theme_tufte() +
+        labs(x="", title="Top 10 Makes per Avg Invoice", x="")+ My_Theme
+    # p
+})
+
+output$margins <- renderPlot({
+    marginByYr=read.csv("data/marginByYear.csv")
+    # z
+    # marginByYr=invoice %>%  group_by(InvoiceYear) %>% 
+    #     summarise(Rev=sum(Total.Line.Revenue), Profit = sum(Revenue.Less.Cost), Cost=sum(Line.Cost))
+    
+    # marginByYr$margin = marginByYr$Profit/marginByYr$Rev
+    # marginByYr$margin = round((marginByYr$Rev - marginByYr$Cost)/marginByYr$Rev,3)
+    marginByYr$InvoiceYear = as.factor(marginByYr$InvoiceYear)
+    ggplot(marginByYr, aes(x=InvoiceYear, y=Rev, fill=InvoiceYear)) + geom_col(alpha=.4) +
+        geom_col(data=marginByYr, aes(x=InvoiceYear, y=Profit, fill=InvoiceYear)) +
+        scale_fill_brewer(palette = "Dark2", labels = c("2018 Profit", "2019 Profit", "2020 Profit")) +
+        scale_y_continuous(labels = label_comma(accuracy = NULL, scale = .000001, 
+                                                prefix = "$", suffix = "mm",
+                                                big.mark = ",")) +
+        geom_text(data=marginByYr, 
+                  aes(x=InvoiceYear, y=Rev, label=paste0(round(margin*100,1),'%')), nudge_y = 2000000) +
+        labs(x="",y="Revenue",fill="", title="Revenue / Profit by Year", caption = "label=margin%")
+    # p
+})
+
+
+output$services <- renderPlot({
+    marginByYr=read.csv("data/marginbyclass.csv")
+    serviceMargins<- marginByClass %>%  filter( str_detect(CLASS_Desc,"Tire|tire", negate=TRUE))
+    serviceMargins <- serviceMargins %>% select(CLASS_Desc, Rev, Profit, margin)
+    write.csv(serviceMargins, 'serviceMargins.csv')
+    serviceMargins <- serviceMargins %>% pivot_longer(c("Rev", "Profit"), names_to="Metric")
+    serviceMarginsRev <- serviceMargins %>% filter(Metric=="Rev")
+    serviceMarginsRev
+    serviceMarginsPro <- serviceMargins %>% filter(Metric=="Profit")
+    serviceMarginsPro$Metric[serviceMarginsPro$value<0] = "Loss"
+    
+    ggplot(serviceMarginsRev, aes(x=reorder(CLASS_Desc, margin), y=value, fill=Metric)) + geom_col() +
+        geom_col(data=serviceMarginsPro, aes(x=CLASS_Desc, y=value, fill=Metric), show.legend = FALSE) + coord_flip() +
+        scale_fill_manual(values = c("red4","green4","grey76")) +
+        scale_y_continuous(labels = label_comma(accuracy = NULL, scale = .000001, 
+                                                prefix = "$", suffix = "mm",
+                                                big.mark = ",")) +
+        geom_text(data=serviceMarginsRev,
+                  aes(x=CLASS_Desc, y=value, label=paste0(round(margin*100,1),'%')), nudge_y = 1000000) +
+        labs(x="",y="Revenue",fill="", title="VTA Service Margins",
+             legend="test") + theme(legend.box = 'horizontal')
+    
+})
+
+output$tires <- renderPlot({
+    marginByYr=read.csv("data/marginbyclass.csv")
+    tireMargins <- marginByClass %>%  filter(str_detect(CLASS_Desc,"Tire|tire"))
+    tireMargins <- tireMargins %>% select(CLASS_Desc, Rev, Profit, margin)
+    write.csv(tireMargins, 'tireMargins.csv')
+    tireMargins <- tireMargins %>% pivot_longer(c("Rev", "Profit"), names_to="Metric")
+    tireMarginsRev <- tireMargins %>% filter(Metric=="Rev")
+    tireMarginsRev
+    tireMarginsPro <- tireMargins %>% filter(Metric=="Profit")
+    tireMarginsPro$Metric[tireMarginsPro$value<0] = "Coupon"
+    
+    ggplot(tireMarginsRev, aes(x=reorder(CLASS_Desc, margin), y=value, fill=Metric)) + geom_col() +
+        geom_col(data=tireMarginsPro, aes(x=CLASS_Desc, y=value, fill=Metric), show.legend = FALSE) + coord_flip() +
+        scale_fill_manual(values = c("red4","green4","grey76")) +
+        scale_y_continuous(labels = label_comma(accuracy = NULL, scale = .000001, 
+                                                prefix = "$", suffix = "mm",
+                                                big.mark = ",")) +
+        geom_text(data=tireMarginsRev,
+                  aes(x=CLASS_Desc, y=value, label=paste0(round(margin*100,1),'%')), nudge_y = 500000) +
+        labs(x="",y="Revenue",fill="", title="Tire Sale Margins",
+             legend="test") + theme(legend.box = 'horizontal')
+})
+
+
+output$revenue <- renderPlot({
+    
+invoice$year = as.factor(year(invoice$INVOICE_DATE))
+invoice$INVOICE_DATE <- lubridate::ymd(invoice$INVOICE_DATE)
+datePlot <- invoice %>%
+    mutate(YearMonth = format(INVOICE_DATE, "%Y-%m"))
+datePlot$YearMonth <- ym(datePlot$YearMonth)
+datePlot <- datePlot %>%  group_by(YearMonth) %>% 
+    mutate(Rev = sum(Total.Line.Revenue)) %>% ungroup()
+
+
+ggplot(datePlot,aes(x=YearMonth, y=Rev, shape=year, color=year)) + geom_point(show.legend = FALSE) + geom_line(group=1, show.legend = FALSE) +
+    facet_wrap(~year, ncol=1,scales = "free_x") +
+    scale_x_date(labels = date_format("%b"), breaks = date_breaks("1 month")) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 8)) + 
+    scale_y_continuous(labels = label_comma(accuracy = NULL, scale = 1, 
+                                            suffix = "", prefix = "$",
+                                            big.mark = ",", decimal.mark = ".")) +
+    labs(title="Revenue Over Time", y="Revenue", x="")
+})
+
+
 }
-
-
-
-
-#run/call the shiny app
-# shinyApp(ui, server)
-
-
 # Run the application 
 shinyApp(ui = ui, server = server)
