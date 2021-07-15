@@ -17,23 +17,23 @@ setwd("~/MSBA/shinyVTA/test")
 options(tigris_use_cache = TRUE)
 # Helper values and functions
 round_any = function(x, accuracy, f=round){f(x/ accuracy) * accuracy}
-# va_zipcodes <- c('20', '22', '23', '24')
-# nvazips <- read.csv("nvazips.csv")
+va_zipcodes <- c('20', '22')# 23, 24
+nvazips <- read.csv("nvazips.csv")
 # smInv <- read.csv("VTA_Invoice_all 7.8.2021.csv")
-# zipcodes <- tigris::zctas(starts_with = va_zipcodes)
+zipcodes <- tigris::zctas(starts_with = va_zipcodes)
 # Saves for reading in (in sshiny app)
-# st_write(zipcodes, "zipcodes.shp")
+st_write(zipcodes, "zipcodesSmall.shp")
 input=tibble(age=2010,
              marketing=76,
              margin=64,
              discount=10,
-             dates=c("2018-01-01", "2020-12-31")
+             dates=c("2018-12-01", "2020-12-31")
 )
 # NEED
 invoice<- read.csv("../data/VTA_Invoice_all 7.8.2021.csv")
 vtaLocations=read.csv("../mapdata/vtalocations.csv")
 
-zipcodes2=st_read("zipcodes.shp")
+zipcodes2=st_read("zipcodesSmall.shp")
 zipcode_totals <- read.csv("zipcodetotals.csv")
 invDates=invoice %>% select(INVOICE_DATE) %>% summarise(earliestINV=min(INVOICE_DATE,na.rm=TRUE), 
                                                         latestINV=max(INVOICE_DATE,na.rm=TRUE))

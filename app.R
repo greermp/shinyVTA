@@ -14,16 +14,19 @@ library(tigris)
 palette="Dark2"
 # setwd("~/MSBA/shinyVTA")
 
-invoice<- read.csv("data/VTA_Invoice_all 7.8.2021.csv")
+##invoice<- read.csv("data/VTA_Invoice_all 7.8.2021.csv")
+invoice<- read.csv("data/VTA_Invoice_all 7.8.2021_wCityCounty.csv")
 vtaLocations=read.csv("mapdata/vtalocations.csv")
-zipcodes2=st_read("mapdata/zipcodes.shp")
+### zipcodes2=st_read("mapdata/zipcodes.shp") Entire State
+zipcodes2=st_read("mapdata/zipcodesSmall.shp")
 
 # input=tibble(age=2010,
 #              marketing=76,
 #              margin=64,
 #              discount=10,
-#              dates=c("2018-01-01", "2018-12-31")
-# )
+#              dates=c("2018-01-01", "2018-12-31"),
+#              datesMap=c("2018-01-01", "2018-12-31")
+#              )
 
 invoice$CUST_CREATE_DATE <- lubridate::ymd(invoice$CUST_CREATE_DATE)
 dates=invoice %>% select(CUST_CREATE_DATE) %>% summarise(EarliestCust=min(CUST_CREATE_DATE,na.rm=TRUE), LatestCust=max(CUST_CREATE_DATE,na.rm=TRUE))
@@ -112,9 +115,14 @@ navbarMenu(title="Data Viz",
              # h1("Hello"),
              
         fluidRow(
-            # plotOutput("custPlot2")
-            splitLayout(cellWidths = c("50%", "50%"),
-            plotOutput("custPlot1",  height = "300px"), plotOutput("custPlot2", height = "300px"))
+            fluidRow(
+            # splitLayout(cellWidths = c("50%", "50%"),
+            box(
+                plotOutput("custPlot1",  height = "300px"), 
+            ),
+            box(
+                plotOutput("custPlot2", height = "300px"))
+            )
         ),
         hr(),
         br(),
@@ -149,16 +157,27 @@ navbarMenu(title="Data Viz",
 ),
 #################### TAB 3 ###########################
 tabPanel("Map",
-         textOutput("missing"),
-         # p("Missing", paste0(as.character(per)), "Zipcodes!"),
-         dateRangeInput("datesMap",'Invoice Date Range', min=invDates$earliestINV, max=invDates$latestINV,
-                        start="2018-12-01", end="2018-12-31"),
-         leafletOutput("mymap"),
-         br(),
-         plotOutput("bar"),
-        
-         p()
-             
+         fluidRow(
+             textOutput("missing"),
+             # p("Missing", paste0(as.character(per)), "Zipcodes!"),
+             column( width=2, offset = 1,
+             dateRangeInput("datesMap",'Invoice Date Range', min=invDates$earliestINV, max=invDates$latestINV,
+                            start="2018-12-01", end="2018-12-31"),
+             ),
+             column(width = 5,
+                    leafletOutput("mymap"),
+                    br()
+             )
+         ),
+        fluidRow(
+         column(width=6,
+                plotOutput("bar") 
+                
+                ),
+         fluidRow(
+         p("Map is being drawn, please wait...")
+         )
+        )
          )# End main panel
          # )# End sidebar panel
     
@@ -392,13 +411,13 @@ server <- function(input, output) {
         bins <- c(0, 
                   # round(themax*.20, 0),
                   # round(themax*.30, 0),
-                  round_any(themax*.10, 100000, floor),
-                  round_any(themax*.20, 100000),
-                  round_any(themax*.30, 100000),
-                  round_any(themax*.40, 100000),
-                  round_any(themax*.60, 100000),
-                  round_any(themax*.80, 100000),
-                  round_any(themax*1.1, 100000))
+                  round_any(themax*.10, 50000, floor),
+                  round_any(themax*.20, 50000),
+                  round_any(themax*.30, 50000),
+                  round_any(themax*.40, 50000),
+                  round_any(themax*.60, 50000),
+                  round_any(themax*.80, 50000),
+                  round_any(themax*1.1, 50000))
         
         bins <- unique(bins)
         
@@ -459,29 +478,42 @@ server <- function(input, output) {
 
 output$custPlot1 <- renderPlot({
     print("I'm here in 1")
-    df = invoice %>% filter(! is.na(NPS)) %>% group_by(NPS) %>% 
-        summarise(Rev = mean(Total.Line.Revenue)) 
-        
-    ggplot(df, aes(x=NPS, y=Rev)) +
+    # df = invoice %>% filter(! is.na(NPS)) %>% group_by(NPS) %>% 
+    #     summarise(Rev = mean(Total.Line.Revenue)) 
+    
+    df = invoice %>% filter(! is.na(NPS)) %>% group_by(CUSTOMER_NUMBER) %>% 
+        summarise(visits = n(), custRevenue = sum(Total.Line.Revenue), NPS=max(NPS)) %>% 
+        group_by(NPS) %>% summarise(meanVisists=mean(visits), meanLifetimeRev=mean(custRevenue))
+    
+    df$NPS <- as.factor(df$NPS)
+    
+    ggplot(df, aes(x=NPS, y=meanVisists, fill= meanLifetimeRev)) +
         geom_col() +
-        scale_y_continuous(labels = label_comma(prefix = "$")) +
-        scale_x_continuous(breaks=pretty_breaks(9)) +
+        scale_y_continuous(labels = label_comma()) +
+        # scale_x_discrete(breaks=pretty_breaks(12)) +
         theme_tufte() +
-        labs(y="", title="Mean Revenue per NPS")
+        scale_fill_viridis_c() +
+        labs(y="Average Visits per Customer", title="Visits and Lifetime Rev / NPS Score", fill="Mean Lifetime Rev ($)") +
+        guides(title = "Mean Lifetime Rev per NPS") + My_Theme
     # p
 })
 
 output$custPlot2 <- renderPlot({
     print("I'm here in 2")
-    df = invoice  %>% group_by(BrandSum) %>% 
-        summarise(Rev = sum(Total.Line.Revenue), count=n()) %>% 
-        arrange(desc(Rev)) %>% slice_max(Rev, n=10) 
-    ggplot(df, aes(reorder(x=BrandSum, -Rev), y=Rev, fill=count)) +
+    df = invoice  %>% group_by(BrandSum) %>% mutate(countBrand=n()) %>% filter(countBrand>5000) %>% ungroup %>% 
+        group_by(CUSTOMER_NUMBER, BrandSum) %>% 
+        summarise(LifetimeRev = sum(Total.Line.Revenue), LifetimeVisits=n()) %>%
+        group_by(BrandSum) %>% summarise(AvgLifetimeRev=mean(LifetimeRev), AvgVisits=mean(LifetimeVisits)) %>% 
+        arrange(desc(AvgLifetimeRev)) %>% slice_max(AvgLifetimeRev, n=10) 
+    ggplot(df, aes(reorder(x=BrandSum, -AvgLifetimeRev), y=AvgLifetimeRev, fill=AvgVisits)) +
         geom_col() +
         scale_y_continuous(labels = label_comma(prefix = "$")) +
+        scale_fill_viridis_c() +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle=45, hjust=1)) +
         # scale_x_continuous(breaks=pretty_breaks(9)) +
-        theme_tufte() +
-        labs(x="", title="Top 10 Makes per Avg Invoice", x="")+ My_Theme
+        labs(y="Average Invoice Amount",x="", title="Top 10 Lifetime Revenue Brands", x="", fill="Avg Visits",
+             caption = "Only Makes with >5000 Customers")  + My_Theme
     # p
 })
 
@@ -502,7 +534,7 @@ output$margins <- renderPlot({
                                                 big.mark = ",")) +
         geom_text(data=marginByYr, 
                   aes(x=InvoiceYear, y=Rev, label=paste0(round(margin*100,1),'%')), nudge_y = 2000000) +
-        labs(x="",y="Revenue",fill="", title="Revenue / Profit by Year", caption = "label=margin%")
+        labs(x="",y="Revenue",fill="", title="Revenue / Profit by Year", caption = "label=margin%") + theme_minimal() + My_Theme
     # p
 })
 
@@ -527,7 +559,7 @@ output$services <- renderPlot({
         geom_text(data=serviceMarginsRev,
                   aes(x=CLASS_Desc, y=value, label=paste0(round(margin*100,1),'%')), nudge_y = 1000000) +
         labs(x="",y="Revenue",fill="", title="VTA Service Margins",
-             legend="test") + theme(legend.box = 'horizontal')
+             legend="test") + theme(legend.box = 'horizontal') + theme_minimal() + My_Theme
     
 })
 
@@ -551,7 +583,7 @@ output$tires <- renderPlot({
         geom_text(data=tireMarginsRev,
                   aes(x=CLASS_Desc, y=value, label=paste0(round(margin*100,1),'%')), nudge_y = 500000) +
         labs(x="",y="Revenue",fill="", title="Tire Sale Margins",
-             legend="test") + theme(legend.box = 'horizontal')
+             legend="test") + theme(legend.box = 'horizontal')+ theme_minimal() + My_Theme
 })
 
 
@@ -573,7 +605,7 @@ ggplot(datePlot,aes(x=YearMonth, y=Rev, shape=year, color=year)) + geom_point(sh
     scale_y_continuous(labels = label_comma(accuracy = NULL, scale = 1, 
                                             suffix = "", prefix = "$",
                                             big.mark = ",", decimal.mark = ".")) +
-    labs(title="Revenue Over Time", y="Revenue", x="")
+    labs(title="Revenue Over Time", y="Revenue", x="")+ theme_minimal() + My_Theme
 })
 
 
@@ -588,7 +620,7 @@ inv %>% group_by(createYear) %>% summarise(Reveneue=sum(Total.Line.Revenue)) %>%
 inv %>% group_by(createYear) %>% select(CUSTOMER_NUMBER) %>% unique() %>%  summarise(newCustomers=n()) %>% 
     ggplot(aes(x=createYear, y=newCustomers)) + geom_col() +
     scale_y_continuous(labels = label_comma()) +
-    labs(title="New Customers per Year", y="", x="")
+    labs(title="New Customers per Year", y="", x="")+ theme_minimal() + My_Theme
 })
 
 }
