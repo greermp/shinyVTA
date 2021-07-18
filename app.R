@@ -1,5 +1,6 @@
 library(shinydashboard)
 library(shiny)
+library(shinyWidgets)
 library(shinythemes)
 library(networkD3)
 library(lubridate)
@@ -12,12 +13,14 @@ library(leaflet)
 library(fontawesome)
 library(tigris)
 palette="Dark2"
-# setwd("~/MSBA/shinyVTA")
+setwd("~/MSBA/shinyVTA")
 
-##invoice<- read.csv("data/VTA_Invoice_all 7.8.2021.csv")
-invoice<- read.csv("data/VTA_Invoice_all 7.8.2021_wCityCounty.csv")
+####invoice<- read.csv("data/VTA_Invoice_all 7.8.2021.csv")
+#### zipcodes2=st_read("mapdata/zipcodes.shp") Entire State
+
+#Good data
+invoice <- read.csv("data/VTA_Invoice_all 7.17.2021_wCityCountyMycar.csv")
 vtaLocations=read.csv("mapdata/vtalocations.csv")
-### zipcodes2=st_read("mapdata/zipcodes.shp") Entire State
 zipcodes2=st_read("mapdata/zipcodesSmall.shp")
 
 # input=tibble(age=2010,
@@ -57,7 +60,7 @@ tabPanel("Vehicle Age",
                      max = 2020,
                      value = 2010,
                      sep = ""),
-         h3("Stuff"),
+         h3("CLV Inputs"),
          numericInput('marketing', 'Marketing per Customer/year ($)', 76, min = 1, max = 9),
          numericInput('margin', 'Sales Margin - Parts&Labor (%)', 64, min = 1, max = 99),
          numericInput('discount', 'Discount Rate (%)', 10, min = 1, max = 50),
@@ -66,8 +69,11 @@ tabPanel("Vehicle Age",
                  hr()
          ),
         mainPanel(
-            tags$style(".small-box.bg-yellow {  border-radius: 10px; background-color: #33B44A !important; color: #000000 !important; }"),
+            # tags$style(".small-box.bg-yellow {  border-radius: 10px; background-color: #33B44A !important; color: #000000 !important; }"),
         fluidRow(
+            # header = tagList(
+                useShinydashboard(),
+            # ),
              valueBoxOutput("value1")
              ,valueBoxOutput("value2")
              ,valueBoxOutput("value3")
@@ -78,14 +84,14 @@ tabPanel("Vehicle Age",
                  ,status = "primary"
                  ,solidHeader = TRUE
                  ,collapsible = TRUE
-                 ,plotOutput("two_L", height = "300px")
+                 ,plotOutput("two_L")
              )
              ,box(
                  title = "CLV per Customer Segment"
                  ,status = "primary"
                  ,solidHeader = TRUE
                  ,collapsible = TRUE
-                 ,plotOutput("two_R", height = "300px")
+                 ,plotOutput("two_R")
              )
          ),
         hr(),
@@ -118,38 +124,73 @@ navbarMenu(title="Data Viz",
             fluidRow(
             # splitLayout(cellWidths = c("50%", "50%"),
             box(
-                plotOutput("custPlot1",  height = "300px"), 
+                title="Number of Visits / Lifetime Revenue by NPS Score",
+                status = "primary",
+                solidHeader = TRUE,
+                collapsible = TRUE,
+                plotOutput("custPlot1")
             ),
             box(
-                plotOutput("custPlot2", height = "300px"))
+                title="Top 10 Lifetime Revenue Makes",
+                status = "primary",
+                solidHeader = TRUE,
+                collapsible = TRUE,
+                plotOutput("custPlot2")
+            )
             )
         ),
-        hr(),
-        br(),
-        column(width = 8, offset=2,
-            plotOutput("revenue")
+        # hr(),
+        # br(),
+        fluidRow(
+            box(
+                title="3-Year Visit History for 2018 new Customers",
+                status = "primary",
+                solidHeader = TRUE,
+                collapsible = TRUE,
+                plotOutput("Retention")
+            ),
+            box(
+                title="Number of Vehicles per Customer",
+                status = "primary",
+                solidHeader = TRUE,
+                collapsible = TRUE,
+                plotOutput("Vehicles")
+            )
+            
         )
+        
+        # column(width = 8, offset=2,
+        #     plotOutput("revenue")
+        # )
     ),
-    tabPanel("Margin Data",
+    tabPanel("Historical Trends",
              # h1("Margin Data"),
              fluidRow(
              box(
-                 title="Historical Margins",
+                 title="2018-2020 Historical Margins",
+                 status = "primary",
+                 solidHeader = TRUE,
                  plotOutput("margins")
              ),
              box(
                  title="New Customers/Year",
+                 status = "primary",
+                 solidHeader = TRUE,
                  plotOutput("customers")
              )
              ),
              fluidRow(
                  box(
-                     title="Service Margins",
+                     title="2018-2020 Service Margins",
+                     status = "primary",
+                     solidHeader = TRUE,
                      plotOutput("services")
                      
                  ),
                  box(
-                     title="Tire Margins",
+                     title="2018-2020 Tire Margins",
+                     status = "primary",
+                     solidHeader = TRUE,
                      plotOutput("tires")
                  )
              )
@@ -164,20 +205,30 @@ tabPanel("Map",
              dateRangeInput("datesMap",'Invoice Date Range', min=invDates$earliestINV, max=invDates$latestINV,
                             start="2018-12-01", end="2018-12-31"),
              ),
-             column(width = 5,
+             column(width = 8,
                     leafletOutput("mymap"),
                     br()
              )
          ),
         fluidRow(
-         column(width=6,
+         box(#width=6,
+             title="2018-2020 Service Margins",
+             status = "primary",
+             solidHeader = TRUE,
                 plotOutput("bar") 
                 
-                ),
+                )),
+         # box(#width=6,
+         #     title="2018-2020 Service CLV",
+         #     status = "primary",
+         #     solidHeader = TRUE,
+         #     plotOutput("bar") 
+         #     
+         # )),
          fluidRow(
-         p("Map is being drawn, please wait...")
+            p("Map is being drawn, please wait...")
          )
-        )
+        
          )# End main panel
          # )# End sidebar panel
     
@@ -205,24 +256,24 @@ server <- function(input, output) {
     #creating the valueBoxOutput content
     output$value1 <- renderValueBox({
         valueBox(
-            paste0('$',formatC(as.numeric(total.revenue/1000000))," MM")
-            ,'Total Reveneue'
+            paste0('$',formatC(as.numeric(total.revenue/1000000)),"")
+            ,'MM Total Reveneue'
             ,icon = icon("money-bill-wave",lib='font-awesome')
-            ,color = "yellow")  
+            ,color = "green")  
     })
     output$value2 <- renderValueBox({ 
         valueBox(
             formatC(as.numeric(total.customers), format="f", big.mark=',', drop0trailing = TRUE)
             ,'Total Unique Customers'
             ,icon = icon("oil-can",lib='font-awesome')
-            ,color = "yellow")  
+            ,color = "olive")  
     })
     output$value3 <- renderValueBox({
         valueBox(
             formatC(customer.2018, format="f", big.mark=',', drop0trailing = TRUE)
             ,'New Customers in 2018'
             ,icon = icon("smile",lib='font-awesome')
-            ,color = "yellow")   
+            ,color = "purple")   
     })
     #creating the plotOutput content
     print("2")
@@ -292,11 +343,7 @@ server <- function(input, output) {
             labs(x="", title="", y="USD") + 
             theme_tufte() + scale_fill_brewer(palette = palette) + My_Theme
     })
-    print("5")
     output$three_L <- renderSankeyNetwork({
-        print("6")
-        # h1("Hello")
-        print("7")
         start=lubridate::ymd(input$dates[1])
         end=lubridate::ymd(input$dates[2])
         CLVInvoice=invoice %>% filter(CUST_CREATE_DATE >= start & CUST_CREATE_DATE <= end)
@@ -493,7 +540,7 @@ output$custPlot1 <- renderPlot({
         # scale_x_discrete(breaks=pretty_breaks(12)) +
         theme_tufte() +
         scale_fill_viridis_c() +
-        labs(y="Average Visits per Customer", title="Visits and Lifetime Rev / NPS Score", fill="Mean Lifetime Rev ($)") +
+        labs(y="Average Visits per Customer", title="", fill="Mean Lifetime Rev ($)") +
         guides(title = "Mean Lifetime Rev per NPS") + My_Theme
     # p
 })
@@ -512,7 +559,7 @@ output$custPlot2 <- renderPlot({
         theme_minimal() +
         theme(axis.text.x = element_text(angle=45, hjust=1)) +
         # scale_x_continuous(breaks=pretty_breaks(9)) +
-        labs(y="Average Invoice Amount",x="", title="Top 10 Lifetime Revenue Brands", x="", fill="Avg Visits",
+        labs(y="Average Invoice Amount",x="", title="", x="", fill="Avg Visits",
              caption = "Only Makes with >5000 Customers")  + My_Theme
     # p
 })
@@ -526,6 +573,7 @@ output$margins <- renderPlot({
     # marginByYr$margin = marginByYr$Profit/marginByYr$Rev
     # marginByYr$margin = round((marginByYr$Rev - marginByYr$Cost)/marginByYr$Rev,3)
     marginByYr$InvoiceYear = as.factor(marginByYr$InvoiceYear)
+    marginByYr
     ggplot(marginByYr, aes(x=InvoiceYear, y=Rev, fill=InvoiceYear)) + geom_col(alpha=.4) +
         geom_col(data=marginByYr, aes(x=InvoiceYear, y=Profit, fill=InvoiceYear)) +
         scale_fill_brewer(palette = "Dark2", labels = c("2018 Profit", "2019 Profit", "2020 Profit")) +
@@ -534,80 +582,100 @@ output$margins <- renderPlot({
                                                 big.mark = ",")) +
         geom_text(data=marginByYr, 
                   aes(x=InvoiceYear, y=Rev, label=paste0(round(margin*100,1),'%')), nudge_y = 2000000) +
-        labs(x="",y="Revenue",fill="", title="Revenue / Profit by Year", caption = "label=margin%") + theme_minimal() + My_Theme
+        labs(x="",y="Revenue",fill="", title="", caption = "label=margin%") + theme_minimal() + My_Theme
     # p
 })
 
 
 output$services <- renderPlot({
-    marginByClass=read.csv("data/marginbyclass.csv")
-    serviceMargins<- marginByClass %>%  filter( str_detect(CLASS_Desc,"Tire|tire", negate=TRUE))
-    serviceMargins <- serviceMargins %>% select(CLASS_Desc, Rev, Profit, margin)
-    write.csv(serviceMargins, 'serviceMargins.csv')
+    # marginByClass=read.csv("data/marginbyclass.csv")
+    # serviceMargins<- marginByClass %>%  filter( str_detect(CLASS_Desc,"Tire|tire", negate=TRUE))
+    # serviceMargins <- serviceMargins %>% select(CLASS_Desc, Rev, Profit, margin)
+    # write.csv(serviceMargins, 'serviceMargins.csv')
+    serviceMargins <- read.csv("data/serviceMargins.csv")
     serviceMargins <- serviceMargins %>% pivot_longer(c("Rev", "Profit"), names_to="Metric")
     serviceMarginsRev <- serviceMargins %>% filter(Metric=="Rev")
     serviceMarginsRev
     serviceMarginsPro <- serviceMargins %>% filter(Metric=="Profit")
     serviceMarginsPro$Metric[serviceMarginsPro$value<0] = "Loss"
+
+    serviceMarginsPro <- serviceMarginsPro %>% filter(value>0)
+    serviceMarginsRev <- serviceMarginsRev %>% filter(value>0)
+    
     
     ggplot(serviceMarginsRev, aes(x=reorder(CLASS_Desc, margin), y=value, fill=Metric)) + geom_col() +
         geom_col(data=serviceMarginsPro, aes(x=CLASS_Desc, y=value, fill=Metric), show.legend = FALSE) + coord_flip() +
-        scale_fill_manual(values = c("red4","green4","grey76")) +
+        scale_fill_manual(values = c("green4","grey76")) +
         scale_y_continuous(labels = label_comma(accuracy = NULL, scale = .000001, 
                                                 prefix = "$", suffix = "mm",
                                                 big.mark = ",")) +
         geom_text(data=serviceMarginsRev,
                   aes(x=CLASS_Desc, y=value, label=paste0(round(margin*100,1),'%')), nudge_y = 1000000) +
-        labs(x="",y="Revenue",fill="", title="VTA Service Margins",
+        labs(x="",y="Revenue",fill="", title="",
              legend="test") + theme(legend.box = 'horizontal') + theme_minimal() + My_Theme
     
 })
 
 output$tires <- renderPlot({
-    marginByClass=read.csv("data/marginbyclass.csv")
-    tireMargins <- marginByClass %>%  filter(str_detect(CLASS_Desc,"Tire|tire"))
-    tireMargins <- tireMargins %>% select(CLASS_Desc, Rev, Profit, margin)
-    write.csv(tireMargins, 'tireMargins.csv')
-    tireMargins <- tireMargins %>% pivot_longer(c("Rev", "Profit"), names_to="Metric")
-    tireMarginsRev <- tireMargins %>% filter(Metric=="Rev")
-    tireMarginsRev
-    tireMarginsPro <- tireMargins %>% filter(Metric=="Profit")
+    # marginByClass=read.csv("data/marginbyclass.csv")
+    # tireMargins <- marginByClass %>%  filter(str_detect(CLASS_Desc,"Tire|tire"))
+    # tireMargins <- tireMargins %>% select(CLASS_Desc, Rev, Profit, margin)
+    # write.csv(tireMargins, 'tireMargins.csv')
+    tireMargin <- read.csv("data/tireMargins.csv")
+    tireMargin <- tireMargin %>% pivot_longer(c("Rev", "Profit"), names_to="Metric")
+    tireMarginsRev <- tireMargin %>% filter(Metric=="Rev")
+    tireMarginsPro <- tireMargin %>% filter(Metric=="Profit")
     tireMarginsPro$Metric[tireMarginsPro$value<0] = "Coupon"
+    
+    tireMarginsPro <- tireMarginsPro %>% filter(value>0)
+    tireMarginsRev <- tireMarginsRev %>% filter(value>0)
     
     ggplot(tireMarginsRev, aes(x=reorder(CLASS_Desc, margin), y=value, fill=Metric)) + geom_col() +
         geom_col(data=tireMarginsPro, aes(x=CLASS_Desc, y=value, fill=Metric), show.legend = FALSE) + coord_flip() +
-        scale_fill_manual(values = c("red4","green4","grey76")) +
+        scale_fill_manual(values = c("green4","grey76")) +
         scale_y_continuous(labels = label_comma(accuracy = NULL, scale = .000001, 
                                                 prefix = "$", suffix = "mm",
                                                 big.mark = ",")) +
         geom_text(data=tireMarginsRev,
                   aes(x=CLASS_Desc, y=value, label=paste0(round(margin*100,1),'%')), nudge_y = 500000) +
-        labs(x="",y="Revenue",fill="", title="Tire Sale Margins",
+        labs(x="",y="Revenue",fill="", title="",
              legend="test") + theme(legend.box = 'horizontal')+ theme_minimal() + My_Theme
 })
 
 
-output$revenue <- renderPlot({
-    
-invoice$year = as.factor(year(invoice$INVOICE_DATE))
-invoice$INVOICE_DATE <- lubridate::ymd(invoice$INVOICE_DATE)
-datePlot <- invoice %>%
-    mutate(YearMonth = format(INVOICE_DATE, "%Y-%m"))
-datePlot$YearMonth <- ym(datePlot$YearMonth)
-datePlot <- datePlot %>%  group_by(YearMonth) %>% 
-    mutate(Rev = sum(Total.Line.Revenue)) %>% ungroup()
-
-
-ggplot(datePlot,aes(x=YearMonth, y=Rev, shape=year, color=year)) + geom_point(show.legend = FALSE) + geom_line(group=1, show.legend = FALSE) +
-    facet_wrap(~year, ncol=1,scales = "free_x") +
-    scale_x_date(labels = date_format("%b"), breaks = date_breaks("1 month")) +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 8)) + 
-    scale_y_continuous(labels = label_comma(accuracy = NULL, scale = 1, 
-                                            suffix = "", prefix = "$",
-                                            big.mark = ",", decimal.mark = ".")) +
-    labs(title="Revenue Over Time", y="Revenue", x="")+ theme_minimal() + My_Theme
+output$Retention <- renderPlot({
+    invoice %>% filter(createYear==2018) %>% 
+        group_by(visit) %>% summarise(count=n(), AvgProfit=mean(Revenue.Less.Cost)) %>% 
+        filter(as.numeric(visit)<=10 ) %>% 
+        mutate(dropoff = count/lag(count)) %>%
+        mutate(dropoff = case_when(is.na(dropoff)~1, TRUE ~ dropoff)) %>%
+        ggplot(aes(x=as.factor(visit), y=count, fill=AvgProfit)) +
+        geom_text(nudge_y = 1000,aes(x=as.factor(visit),y=count,label=paste0(round(dropoff*100,0),"%"))) +
+        # facet_wrap(~MyCarClub) +
+        geom_col() + theme_minimal() + scale_y_continuous(labels = label_comma(), breaks = pretty_breaks()) +
+        labs(title="", x="Visit Number", y="# of Customers") + 
+        scale_fill_gradient() + My_Theme
 })
 
+output$Vehicles <- renderPlot({
+    z=invoice %>%  group_by(numVehicles) %>% summarise(num=n()) %>% mutate(total=sum(num))
+    z=invoice %>% group_by(CUSTOMER_NUMBER) %>% 
+        summarise(numVehicles=n_distinct(VIN_NUMBER))
+    
+    z$numVehicles=as.factor(z$numVehicles)
+    z=z %>% 
+        mutate(numVehicles=case_when(
+            as.numeric(numVehicles)>=5 ~ "5+",
+            TRUE ~ as.character(numVehicles)
+        ))
+    
+    z %>% group_by(numVehicles) %>% summarise(num=n()) %>% 
+        mutate(total=sum(num), per=num/total) %>% 
+        ggplot(aes(x=as.factor(numVehicles), y=num)) + geom_col() +
+        geom_text(aes(label=paste0(round(per*100,0),"%")), nudge_y = 10000) +
+        scale_y_continuous(labels = label_comma(), breaks=pretty_breaks(6)) +
+        theme_minimal() + labs(x="Number of Vehicles Serviced", y="Customers")+ My_Theme
+})
 
 output$customers <- renderPlot({
     
@@ -620,7 +688,7 @@ inv %>% group_by(createYear) %>% summarise(Reveneue=sum(Total.Line.Revenue)) %>%
 inv %>% group_by(createYear) %>% select(CUSTOMER_NUMBER) %>% unique() %>%  summarise(newCustomers=n()) %>% 
     ggplot(aes(x=createYear, y=newCustomers)) + geom_col() +
     scale_y_continuous(labels = label_comma()) +
-    labs(title="New Customers per Year", y="", x="")+ theme_minimal() + My_Theme
+    labs(title="", y="", x="")+ theme_minimal() + My_Theme
 })
 
 }
