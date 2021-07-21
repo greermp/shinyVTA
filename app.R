@@ -13,16 +13,18 @@ library(leaflet)
 library(fontawesome)
 library(tigris)
 palette="Dark2"
-setwd("~/MSBA/shinyVTA")
+# setwd("~/MSBA/shinyVTA")
 
 ####invoice<- read.csv("data/VTA_Invoice_all 7.8.2021.csv")
 #### zipcodes2=st_read("mapdata/zipcodes.shp") Entire State
 
 #Good data
-invoice <- read.csv("data/VTA_Invoice_all 7.17.2021_wCityCountyMycar.csv")
+invoice <- read.csv("data/VTA_Invoice_all 7.18.2021_wCityCountyMycarNumVeh.csv")
 vtaLocations=read.csv("mapdata/vtalocations.csv")
 zipcodes2=st_read("mapdata/zipcodesSmall.shp")
 
+# invoice %>% mutate(numVehiclesFactor=fct_relevel()
+invoice$numVehiclesFactor <- factor(invoice$numVehiclesFactor, levels=c("1", "2", "3", "4", "5-10", "10+"))
 # input=tibble(age=2010,
 #              marketing=76,
 #              margin=64,
@@ -38,11 +40,15 @@ round_any = function(x, accuracy, f=round){f(x/ accuracy) * accuracy}
 My_Theme = theme(
     axis.title.x = element_text(size = 16),
     axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14),
     axis.title.y = element_text(size = 16))
 
 
 invDates=invoice %>% select(INVOICE_DATE) %>% summarise(earliestINV=min(INVOICE_DATE,na.rm=TRUE), 
                                                         latestINV=max(INVOICE_DATE,na.rm=TRUE))
+
+createDates=invoice %>% select(CUST_CREATE_DATE) %>% summarise(earliestCreate=min(CUST_CREATE_DATE,na.rm=TRUE), 
+                                                        latestCreate=max(CUST_CREATE_DATE,na.rm=TRUE))
 
 invoice <- invoice %>%  mutate(Zip.Code = str_sub(Zip.Code, start=1, end=5))
 
@@ -106,13 +112,109 @@ tabPanel("Vehicle Age",
         )# End sidebar panel
 ),
 tabPanel("MyCar Member",
-         # fluidRow(
-         h3("Coming Soon")
+         fluidRow(
+             # column(width = 6, title="HI", renderText("test")),
+             # column(width = 6, title="HI",renderText("test")),
+             # 
+             valueBoxOutput(width = 3, "mycarCust")
+             ,valueBoxOutput(width = 3,"mycarAvgRev")
+             ,valueBoxOutput(width = 3,"mycarAvgVisits")
+             ,valueBoxOutput(width = 3,"mycartimeBetweenVisits")
+         ),
+         fluidRow(
+             valueBoxOutput(width = 3, "Cust")
+             ,valueBoxOutput(width = 3,"AvgRev")
+             ,valueBoxOutput(width = 3,"AvgVisits")
+             ,valueBoxOutput(width = 3,"timeBetweenVisits")
+         ),
+         fluidRow(
+             box(
+                 title = "My Car Customers"
+                 ,status = "primary"
+                 ,solidHeader = TRUE
+                 ,collapsible = TRUE
+                 ,plotOutput("MyCarAvgRevenue")
+             )
+             ,box(
+                 title = "Non-My Car Members"
+                 ,status = "primary"
+                 ,solidHeader = TRUE
+                 ,collapsible = TRUE
+                 ,plotOutput("MyCarRetentionHistory")
+             )
+         ),
+         fluidRow(
+             box(
+                 title = "Customer Lifetime Value"
+                 ,status = "primary"
+                 ,solidHeader = TRUE
+                 ,collapsible = TRUE
+                 ,plotOutput("myCarCLV")
+             )
+         )
 )   
-,
-tabPanel("City",
-         # fluidRow(
-         h3("Coming Soon")
+,tabPanel("Zipcode",
+          fluidRow(
+              column(width = 8, offset = 2,
+                     leafletOutput("clvMap"),
+                     br()
+                  )
+              ),
+              fluidRow(
+                  column( width=2, offset = 5,
+                          dateRangeInput("datesCLVMap",'Customer Creation Range', min=invDates$earliestCreate, max=invDates$latestCreate,
+                                         start="2018-01-01", end="2018-12-31"),
+                  )
+              ),
+          fluidRow(
+              box(
+                  title = "CLV by Zipcode"
+                  ,status = "primary"
+                  ,solidHeader = TRUE
+                  ,collapsible = TRUE
+                  ,plotOutput("City")
+              )
+              ,box(
+                  title = "CLV by County"
+                  ,status = "primary"
+                  ,solidHeader = TRUE
+                  ,collapsible = TRUE
+                  ,plotOutput("County")
+              )
+          )
+),tabPanel("Number of Vehicles",
+           fluidRow(
+               box(
+                   title = "Distribution of Vehicles Serviced per Customer"
+                   ,status = "primary"
+                   ,solidHeader = TRUE
+                   ,collapsible = TRUE
+                   ,plotOutput("NumVehicles")
+               )
+               ,box(
+                   title = "Total Revenue by Customer Segment (2018-2020)"
+                   ,status = "primary"
+                   ,solidHeader = TRUE
+                   ,collapsible = TRUE
+                   ,plotOutput("LifetimeRevByVehicle")
+               )
+           ),
+           fluidRow(
+               box(
+                   title = "Average # of Visits by Number of Vehicles Serviced"
+                   ,status = "primary"
+                   ,solidHeader = TRUE
+                   ,collapsible = TRUE
+                   ,plotOutput("visitByVehicle")
+               )
+               ,box(
+                   title = "Customer Lifetime Value by Number of Vehicles Serviced"
+                   ,status = "primary"
+                   ,solidHeader = TRUE
+                   ,collapsible = TRUE
+                   ,plotOutput("vehicleCLV")
+               )
+           )
 )   
 ),# End Tab 1
 #################### TAB 2 ###########################
@@ -199,11 +301,10 @@ navbarMenu(title="Data Viz",
 #################### TAB 3 ###########################
 tabPanel("Map",
          fluidRow(
-             textOutput("missing"),
-             # p("Missing", paste0(as.character(per)), "Zipcodes!"),
              column( width=2, offset = 1,
+                 textOutput("missing"),
              dateRangeInput("datesMap",'Invoice Date Range', min=invDates$earliestINV, max=invDates$latestINV,
-                            start="2018-12-01", end="2018-12-31"),
+                            start="2020-12-01", end="2020-12-31"),
              ),
              column(width = 8,
                     leafletOutput("mymap"),
@@ -212,7 +313,7 @@ tabPanel("Map",
          ),
         fluidRow(
          box(#width=6,
-             title="2018-2020 Service Margins",
+             title="Revenue By Store",
              status = "primary",
              solidHeader = TRUE,
                 plotOutput("bar") 
@@ -247,12 +348,16 @@ total.revenue <- as.numeric(round(invoice %>% summarise(sum(Total.Line.Revenue))
 total.customers <- as.numeric(round(invoice %>% group_by(CUSTOMER_NUMBER) %>% select(CUSTOMER_NUMBER) %>% unique() %>% nrow(), 2))
 customer.2018 <- as.numeric(round(invoice %>% filter(createYear == 2018) %>% group_by(CUSTOMER_NUMBER) %>% select(CUSTOMER_NUMBER) %>% unique() %>% nrow(), 2))
 
+myCarCLV=invoice %>% filter(createYear==2018) %>% 
+    group_by(MyCarClub, visit) %>% summarise(count=n(), 
+                                             avgTimeBeteen=mean(TimeToNextVisit, na.rm = TRUE), 
+                                             AvgProfit=mean(Revenue.Less.Cost)) %>% 
+    group_by(MyCarClub) %>% mutate(totalSegment=first(count), perActive=count/totalSegment) 
 
 
 # create the server functions for the dashboard  
 server <- function(input, output) { 
     #some data manipulation to derive the values of KPI boxes
-    print("1")
     #creating the valueBoxOutput content
     output$value1 <- renderValueBox({
         valueBox(
@@ -275,8 +380,80 @@ server <- function(input, output) {
             ,icon = icon("smile",lib='font-awesome')
             ,color = "purple")   
     })
+############################
+    output$mycarCust <- renderValueBox({
+        numCust=myCarCLV %>% ungroup() %>%  filter(MyCarClub=="True" & visit==1) %>% select(count)
+            valueBox(width=3,
+                formatC(as.numeric(numCust))
+                ,'New My Car Customers in 2018'
+                ,icon = icon("smile",lib='font-awesome')
+                ,color = "green")  
+        })
+    output$mycarAvgRev <- renderValueBox({ 
+        avg=invoice %>% filter(MyCarClub=="True") %>% summarise(mean(Total.Line.Revenue))
+        valueBox(width=3,
+            paste0('$ ',formatC(as.numeric(avg)))
+            ,'Average Invoice amount (My-Car Customers)'
+            ,icon = icon("money-bill-wave",lib='font-awesome')
+            ,color = "green")  
+    })
+    output$mycarAvgVisits <- renderValueBox({
+        numCust=myCarCLV %>% ungroup() %>%  filter(MyCarClub=="False" & visit==1) %>% select(count)
+        
+        valueBox(width=3,
+                 formatC(round(as.numeric(numCust),0),format="f", big.mark = ',', drop0trailing = TRUE)
+                 ,'New in 2018 (Not My Car Customers)'
+                 ,icon = icon("smile",lib='font-awesome')
+                 ,color = "orange") 
+    })
+    output$mycartimeBetweenVisits <- renderValueBox({
+        
+        avg=invoice %>% filter(MyCarClub=="False") %>% summarise(mean(Total.Line.Revenue))
+        valueBox(width=3,
+                 paste0('$ ',formatC(as.numeric(avg)))
+                 ,'Average Invoice amount (My-Car Customers)'
+                 ,icon = icon("money-bill-wave",lib='font-awesome')
+                 ,color = "orange")  
+    })
+    ####################
+    output$Cust <- renderValueBox({
+        avg=invoice %>% filter(MyCarClub=="True") %>% summarise(mean(numVisits))
+        
+        valueBox(width=3,
+                 formatC(round(as.numeric(avg),1), format="f", big.mark=',', drop0trailing = TRUE)
+                 ,'Average Vists from 2018-2020 (My-Car Customers)'
+                 ,icon = icon("door-open",lib='font-awesome')
+                 ,color = "green")   
+    })
+    output$AvgRev <- renderValueBox({ 
+        avg=invoice %>% filter(MyCarClub=="True") %>% summarise(mean(TimeToNextVisit, na.rm = TRUE))
+        
+        valueBox(width=3,
+                 formatC(round(as.numeric(avg),1), format="f", big.mark=',', drop0trailing = TRUE)
+                 ,'Average Time Between Visits (My-Car Customers)'
+                 ,icon = icon("history",lib='font-awesome')
+                 ,color = "green")  
+        
+    })
+    output$AvgVisits <- renderValueBox({
+        avg=invoice %>% filter(MyCarClub=="False") %>% summarise(mean(numVisits))
+        
+        valueBox(width=3,
+                 formatC(round(as.numeric(as.numeric(avg),1)), format="f", big.mark=',', drop0trailing = TRUE)
+                 ,'Average Vists from 2018-2020 (My-Car Customers)'
+                 ,icon = icon("door-open",lib='font-awesome')
+                 ,color = "orange")   
+    })
+    output$timeBetweenVisits <- renderValueBox({
+        avg=invoice %>% filter(MyCarClub=="False") %>% summarise(mean(TimeToNextVisit, na.rm = TRUE))
+        
+        valueBox(width=3,
+                 formatC(round(as.numeric(avg),1), format="f", big.mark=',', drop0trailing = TRUE)
+                 ,'Average Days Between Visits (Non My-Car Customers)'
+                 ,icon = icon("history",lib='font-awesome')
+                 ,color = "orange")   
+    })
     #creating the plotOutput content
-    print("2")
     output$two_L <- renderPlot({
         vehage <- invoice %>%
             mutate(factor=case_when(
@@ -445,13 +622,15 @@ server <- function(input, output) {
     output$mymap <- renderLeaflet({
         zipcode_totals <- invoice %>% filter(INVOICE_DATE>= input$datesMap[1] &
                                                  INVOICE_DATE<= input$datesMap[2]) %>% 
-            group_by(Zip.Code) %>% summarise(Revenue=sum(Total.Line.Revenue))
+            group_by(Zip.Code.Clean) %>% summarise(Revenue=sum(Total.Line.Revenue), count=n()) %>% 
+            filter(Zip.Code.Clean != "") %>% filter(count >=50)
         
+        zipcode_totals$Zip.Code.Clean = as.character(zipcode_totals$Zip.Code.Clean)
         # Geojoin totals with zipcodes
         zipcodes_w_totals <- geo_join(zipcodes2, 
                                       zipcode_totals, 
                                       by_sp = "GEOID10", 
-                                      by_df = "Zip.Code",
+                                      by_df = "Zip.Code.Clean",
                                       how = "left")
         
         themax=max(zipcodes_w_totals$Revenue, na.rm = TRUE)
@@ -504,9 +683,7 @@ server <- function(input, output) {
     })
     
     output$bar <- renderPlot({
-        
-        
-        p <- invoice %>%
+    p <- invoice %>%
             filter(INVOICE_DATE>= input$datesMap[1] &
                         INVOICE_DATE<= input$datesMap[2]) %>% 
             group_by(Store.ID) %>% 
@@ -653,7 +830,7 @@ output$Retention <- renderPlot({
         geom_text(nudge_y = 1000,aes(x=as.factor(visit),y=count,label=paste0(round(dropoff*100,0),"%"))) +
         # facet_wrap(~MyCarClub) +
         geom_col() + theme_minimal() + scale_y_continuous(labels = label_comma(), breaks = pretty_breaks()) +
-        labs(title="", x="Visit Number", y="# of Customers") + 
+        labs(title="", x="Visit Number", y="# of Customers", fill="Average Profit") + 
         scale_fill_gradient() + My_Theme
 })
 
@@ -691,6 +868,246 @@ inv %>% group_by(createYear) %>% select(CUSTOMER_NUMBER) %>% unique() %>%  summa
     labs(title="", y="", x="")+ theme_minimal() + My_Theme
 })
 
+output$MyCarAvgRevenue <- renderPlot({
+    invoice %>% filter(createYear==2018 & MyCarClub=="True") %>% 
+        group_by(MyCarClub, visit) %>% summarise(count=n(), AvgProfit=mean(Revenue.Less.Cost)) %>% 
+        filter(as.numeric(visit)<=10 & ! is.na(MyCarClub)) %>% 
+        mutate(dropoff = count/lag(count)) %>%
+        mutate(dropoff = case_when(is.na(dropoff)~1, TRUE ~ dropoff)) %>%
+        ggplot(aes(x=as.factor(visit), y=count, fill=AvgProfit)) +geom_col() +
+        # facet_wrap(~MyCarClub) +
+        geom_text(nudge_y = 20,aes(x=as.numeric(visit),y=count,label=paste0(round(dropoff*100,0),"%"))) +
+        theme_minimal() + scale_y_continuous(labels = label_comma(), breaks = pretty_breaks()) +
+        labs(title="", x= "Visit Number", y="Number of Customers", fill="Average Profit") + My_Theme
+})
+
+output$MyCarRetentionHistory <- renderPlot({
+
+    invoice %>% filter(createYear==2018 & MyCarClub=="False") %>% 
+        group_by(MyCarClub, visit) %>% summarise(count=n(), AvgProfit=mean(Revenue.Less.Cost)) %>% 
+        filter(as.numeric(visit)<=10 & ! is.na(MyCarClub)) %>% 
+        mutate(dropoff = count/lag(count)) %>%
+        mutate(dropoff = case_when(is.na(dropoff)~1, TRUE ~ dropoff)) %>%
+        ggplot(aes(x=as.factor(visit), y=count, fill=AvgProfit)) +geom_col() +
+        # facet_wrap(~MyCarClub) +
+        geom_text(nudge_y = 1000,aes(x=as.numeric(visit),y=count,label=paste0(round(dropoff*100,0),"%"))) +
+         theme_minimal() + scale_y_continuous(labels = label_comma(), breaks = pretty_breaks()) +
+        labs(title="", x= "Visit Number", y="Number of Customers", fill="Average Profit") + My_Theme
+    })
+
+output$myCarCLV <- renderPlot({
+    myCarCLV=invoice %>% filter(createYear==2018) %>%
+        group_by(MyCarClub, visit) %>% summarise(count=n(),
+                                                 avgTimeBeteen=mean(TimeToNextVisit, na.rm = TRUE),
+                                                 AvgProfit=mean(Revenue.Less.Cost)) %>%
+        group_by(MyCarClub) %>% mutate(totalSegment=first(count), perActive=count/totalSegment)
+    
+    myCarCLV %>% group_by(MyCarClub) %>% mutate(Profit=AvgProfit*(count*perActive)) %>% 
+        summarise(TotalProfit=sum(Profit), perCust=TotalProfit/first(count)) %>% ungroup() %>% 
+        mutate(cat=case_when(
+            MyCarClub=="True" ~ "My Car Club Member",
+            TRUE ~ "Non-member"
+        )) %>% 
+        ggplot(aes(x=cat, y=perCust, fill=cat)) +
+        geom_col() + theme_minimal() +
+        scale_fill_brewer(palette = palette) +
+        labs(x="", y="Customer Lifetime Value", fill="") +
+        My_Theme
+
+})
+
+output$NumVehicles <- renderPlot({
+    invoice %>% filter(createYear==2018) %>% 
+        group_by(numVehiclesFactor) %>% summarise(num=n()) %>% 
+        mutate(total=sum(num), per=num/total) %>% 
+        ggplot(aes(x=as.factor(numVehiclesFactor), y=num)) + geom_col() +
+        geom_text(aes(label=paste0(round(per*100,0),"%")), nudge_y = 1500) +
+        scale_y_continuous(labels = label_comma(), breaks=pretty_breaks(6)) +
+        theme_minimal() + labs(x="Vehicles Serviced", y="Customers", fill="# Vehicles Per Customer") + My_Theme
+})
+
+output$vehicleCLV <- renderPlot({
+    numVeh=invoice %>% filter(createYear==2018) %>%
+        group_by(numVehiclesFactor, visit) %>% summarise(count=n(),
+                                                 avgTimeBeteen=mean(TimeToNextVisit, na.rm = TRUE),
+                                                 AvgProfit=mean(Revenue.Less.Cost)) %>%
+        group_by(numVehiclesFactor) %>% mutate(totalSegment=first(count), perActive=count/totalSegment)
+    
+    numVeh %>% group_by(numVehiclesFactor) %>% mutate(Profit=AvgProfit*(count*perActive)) %>% 
+        summarise(TotalProfit=sum(Profit), perCust=TotalProfit/first(count)) %>% ungroup() %>% 
+        ggplot(aes(x=numVehiclesFactor, y=perCust, fill=numVehiclesFactor )) +
+        geom_col() + theme_minimal() +
+        scale_fill_brewer(palette = palette) +
+        labs(x="Vehicles Serviced", y="Customer Lifetime Value", fill="Vehicles per Customer") + My_Theme +
+        scale_y_continuous(labels = label_comma(accuracy = NULL, scale = 1,
+                                                prefix = "$", suffix = "",
+                                                big.mark = ",", decimal.mark = "."), breaks=pretty_breaks(8)) 
+})
+
+
+output$visitByVehicle <- renderPlot({
+    invoice %>% group_by(numVehiclesFactor) %>% 
+        summarise(meanTimeBetween = mean(TimeToNextVisit, na.rm = TRUE), numVisits = mean(numVisits)) %>% 
+        ggplot(aes(x=numVehiclesFactor, y=numVisits)) +
+        geom_col() + theme_minimal() +
+        geom_text(aes(label=round(numVisits,1)), nudge_y = 5) +
+        labs(x="Vehicles Serviced", y="Average Number of Visits") + My_Theme +
+        scale_y_continuous(breaks=pretty_breaks())
+})
+
+
+output$LifetimeRevByVehicle <- renderPlot({
+    invoice %>% filter(createYear==2018) %>% group_by(numVehiclesFactor) %>% 
+        summarise(avgRevenue = sum(Total.Line.Revenue, na.rm = TRUE)) %>% 
+        ggplot(aes(x=as.factor(numVehiclesFactor), y=avgRevenue)) +
+        geom_col() + theme_minimal() +
+        labs(x="Vehicles Serviced", y="2018-2020 Revenue") +
+        scale_y_continuous(labels = label_comma(accuracy = NULL, scale = 1,
+                                                prefix = "$", suffix = "",
+                                                big.mark = ",", decimal.mark = ".")) +
+        My_Theme
+})
+
+
+output$clvMap <- renderLeaflet({
+    zipcode_totals <- invoice %>% filter(CUST_CREATE_DATE>= input$datesCLVMap[1] &
+                                             CUST_CREATE_DATE<= input$datesCLVMap[2]) %>% 
+        group_by(Zip.Code.Clean, visit) %>% summarise(count=n(),
+                                                avgTimeBeteen=mean(TimeToNextVisit, na.rm = TRUE),
+                                                AvgProfit=mean(Revenue.Less.Cost)) %>%
+        group_by(Zip.Code.Clean) %>% mutate(totalSegment=first(count), perActive=count/totalSegment) %>% 
+        filter(Zip.Code.Clean != "") %>% 
+        filter(totalSegment >=15)
+    
+    zipcode_totals$Zip.Code.Clean <-  as.character(zipcode_totals$Zip.Code.Clean)
+    
+    zipcode_totals <- zipcode_totals %>% group_by(Zip.Code.Clean, visit) %>% mutate(Profit=AvgProfit*count) %>% 
+        group_by(Zip.Code.Clean) %>% 
+        summarise(TotalProfit=sum(Profit), perCust=TotalProfit/first(count), count=first(count))
+    
+    # Geojoin totals with zipcodes
+    zipcodes_w_totals <- geo_join(zipcodes2, 
+                                  zipcode_totals, 
+                                  by_sp = "GEOID10", 
+                                  by_df = "Zip.Code.Clean",
+                                  how = "left")
+    
+    themax=max(zipcodes_w_totals$perCust, na.rm = TRUE)
+    # bins <- c(0, 
+    #           # round(themax*.20, 0),
+    #           # round(themax*.30, 0),
+    #           round_any(themax*.10, 50, floor),
+    #           round_any(themax*.20, 50),
+    #           round_any(themax*.30, 50),
+    #           round_any(themax*.40, 50),
+    #           round_any(themax*.50, 50),
+    #           round_any(themax*.60, 50),
+    #           round_any(themax*.70, 50),
+    #           round_any(themax*.80, 50),
+    #           round_any(themax*.90, 50),
+    #           round_any(themax*1.1, 50))
+    
+    bins <- c(0, 100, 200, 300, 400, 500, 600, 700,800,Inf)
+    
+    bins <- unique(bins)
+    
+    pal <- colorBin("YlOrRd", domain = zipcode_totals$perCust, bins = bins)
+    
+    
+    # Leaflet map
+    map <- zipcodes_w_totals %>% 
+        leaflet %>%
+        # add base map
+        addProviderTiles("CartoDB") %>% 
+        # add zip codes
+        addPolygons(fillColor = ~pal(perCust),
+                    weight = 0.5,
+                    opacity = 1,
+                    color = "black",
+                    dashArray = "1",
+                    fillOpacity = 0.5,
+                    popup = paste0("Zip: ",zipcodes_w_totals$GEOID10, "<br>", "CLV: ",
+                                   comma( round(zipcodes_w_totals$perCust,0),prefix = '$' ),
+                                   "<br>","Customers: ",comma(zipcodes_w_totals$count),"<br>",
+                                   "Total Profit: ",comma(zipcodes_w_totals$TotalProfit, prefix = '$') 
+                                   
+                                   ), 
+                    highlight = highlightOptions(weight = 2,
+                                                 color = "#666",
+                                                 dashArray = "",
+                                                 fillOpacity = 0.4,
+                                                 bringToFront = TRUE)) %>% 
+        setView(lng = -77.5, lat = 38.7,  zoom = 9) %>% 
+        # add legend
+        addLegend(pal = pal, 
+                  values = ~perCust, 
+                  opacity = 0.7, 
+                  title = "CLV by Zip",
+                  position = "topright") %>% 
+        addMarkers(lng = ~vtaLocations$Long, lat = ~vtaLocations$Lat, label = vtaLocations$Location)
+    
+    
+    map
+})
+
+
+output$City <- renderPlot({
+    zipcode_totals <- invoice %>% filter(CUST_CREATE_DATE>= input$datesCLVMap[1] &
+                                             CUST_CREATE_DATE<= input$datesCLVMap[2]) %>% 
+        group_by(city, visit) %>% summarise(count=n(),
+                                                      avgTimeBeteen=mean(TimeToNextVisit, na.rm = TRUE),
+                                                      AvgProfit=mean(Revenue.Less.Cost)) %>%
+        group_by(city) %>% mutate(totalSegment=first(count), perActive=count/totalSegment) %>% 
+        filter(city != "") %>% 
+        filter(totalSegment >=50)
+    
+    zipcode_totals$city <-  as.character(zipcode_totals$city)
+    
+    zipcode_totals <- zipcode_totals %>% group_by(city) %>% mutate(Profit=AvgProfit*count) %>% 
+        summarise(TotalProfit=sum(Profit), perCust=TotalProfit/first(count), custAtGroupOne=first(count))
+    
+    ggplot(zipcode_totals, aes(x=reorder(city, -perCust), y=perCust, fill=custAtGroupOne)) +
+        geom_col()+ scale_y_continuous(labels = label_comma(accuracy = NULL, scale = 1,
+                                                             prefix = "$", suffix = "",
+                                                             big.mark = ",", decimal.mark = ".")) +
+        theme_minimal() +
+        My_Theme + labs(x="", y="Customer Timetime Value", fill="# Customers") + theme(axis.text.x = element_text(angle=45, hjust = 1))
+})
+
+
+output$County <- renderPlot({
+    zipcode_totals <- invoice %>% filter(CUST_CREATE_DATE>= input$datesCLVMap[1] &
+                                             CUST_CREATE_DATE<= input$datesCLVMap[2]) %>% 
+        group_by(county, visit) %>% summarise(count=n(),
+                                            avgTimeBeteen=mean(TimeToNextVisit, na.rm = TRUE),
+                                            AvgProfit=mean(Revenue.Less.Cost)) %>%
+        group_by(county) %>% mutate(totalSegment=first(count), perActive=count/totalSegment) %>% 
+        filter(county != "") %>% 
+        filter(totalSegment >=50)
+    
+    zipcode_totals$county <-  as.character(zipcode_totals$county)
+    
+    zipcode_totals <- zipcode_totals %>% group_by(county) %>% mutate(Profit=AvgProfit*count) %>% 
+        summarise(TotalProfit=sum(Profit), perCust=TotalProfit/first(count), custAtGroupOne=first(count))
+    
+    ggplot(zipcode_totals, aes(x=reorder(county, -perCust), y=perCust, fill=custAtGroupOne)) +
+        geom_col() + scale_y_continuous(labels = label_comma(accuracy = NULL, scale = 1,
+                                            prefix = "$", suffix = "",
+                                            big.mark = ",", decimal.mark = ".")) +
+        theme_minimal() +
+        My_Theme + labs(x="", y="Customer Timetime Value", fill="# Customers") + theme(axis.text.x = element_text(angle=45, hjust = 1))
+})
+
 }
+
+
+# input=tibble(
+#              discount=10,
+#              dates=c("2018-01-01", "2018-12-31"),
+#              datesMap=c("2018-01-01", "2018-12-31"),
+#              datesCLVMap=c("2018-01-01", "2018-12-31")
+#              )
+
 # Run the application 
 shinyApp(ui = ui, server = server)
+
