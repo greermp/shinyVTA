@@ -15,11 +15,12 @@ library(tigris)
 palette="Dark2"
 # setwd("~/MSBA/shinyVTA")
 
-####invoice<- read.csv("data/VTA_Invoice_all 7.8.2021.csv")
 #### zipcodes2=st_read("mapdata/zipcodes.shp") Entire State
 
 #Good data
-invoice <- read.csv("data/VTA_Invoice_all 7.18.2021_wCityCountyMycarNumVeh.csv")
+#####invoice <- read.csv("data/VTA_Invoice_all 7.18.2021_wCityCountyMycarNumVeh.csv")
+
+invoice <- read.csv("data/VTA_Invoice_all_2  7.27.2021.csv")
 vtaLocations=read.csv("mapdata/vtalocations.csv")
 zipcodes2=st_read("mapdata/zipcodesSmall.shp")
 
@@ -37,12 +38,18 @@ invoice$CUST_CREATE_DATE <- lubridate::ymd(invoice$CUST_CREATE_DATE)
 dates=invoice %>% select(CUST_CREATE_DATE) %>% summarise(EarliestCust=min(CUST_CREATE_DATE,na.rm=TRUE), LatestCust=max(CUST_CREATE_DATE,na.rm=TRUE))
 round_any = function(x, accuracy, f=round){f(x/ accuracy) * accuracy}
 
+# My_Theme = theme(
+#     axis.title.x = element_text(size = 16),
+#     axis.text.x = element_text(size = 14),
+#     axis.text.y = element_text(size = 14),
+#     axis.title.y = element_text(size = 16))
 My_Theme = theme(
-    axis.title.x = element_text(size = 16),
-    axis.text.x = element_text(size = 14),
-    axis.text.y = element_text(size = 14),
-    axis.title.y = element_text(size = 16))
-
+  axis.title.x = element_text(size = 16),
+  axis.text.x = element_text(size = 14),
+  axis.text.y = element_text(size = 14),
+  axis.title.y = element_text(size = 16),
+  plot.title = element_text(color = "#3BB44A", size = 20, face = "bold"),
+  plot.subtitle = element_text(color = "#3BB44A", size = 16, face = "bold"))
 
 invDates=invoice %>% select(INVOICE_DATE) %>% summarise(earliestINV=min(INVOICE_DATE,na.rm=TRUE), 
                                                         latestINV=max(INVOICE_DATE,na.rm=TRUE))
@@ -50,7 +57,7 @@ invDates=invoice %>% select(INVOICE_DATE) %>% summarise(earliestINV=min(INVOICE_
 createDates=invoice %>% select(CUST_CREATE_DATE) %>% summarise(earliestCreate=min(CUST_CREATE_DATE,na.rm=TRUE), 
                                                         latestCreate=max(CUST_CREATE_DATE,na.rm=TRUE))
 
-invoice <- invoice %>%  mutate(Zip.Code = str_sub(Zip.Code, start=1, end=5))
+# invoice <- invoice %>%  mutate(Zip.Code = str_sub(Zip.Code, start=1, end=5))
 
 invoice$Zip.Code <- as.factor(invoice$Zip.Code)
 
@@ -60,17 +67,29 @@ collapsible = TRUE,
 navbarMenu("CLV",
 tabPanel("Vehicle Age",
      sidebarLayout(sidebarPanel(icon("dashboard"),width = 3,
-         sliderInput("age",
-                     "Vehicle Age Segment:",
-                     min = 1995,
-                     max = 2020,
-                     value = 2010,
-                     sep = ""),
-         h3("CLV Inputs"),
-         numericInput('marketing', 'Marketing per Customer/year ($)', 76, min = 1, max = 9),
-         numericInput('margin', 'Sales Margin - Parts&Labor (%)', 64, min = 1, max = 99),
-         numericInput('discount', 'Discount Rate (%)', 10, min = 1, max = 50),
-         dateRangeInput("dates",'Customer Creation Date Range (CLV)', min=dates$EarliestCust, max=dates$LatestCust,
+            sliderInput("age",
+                        "Vehicle Age Segment 1:",
+                        min = 1995,
+                        max = 2020,
+                        value = c(2005,2010),
+                        sep = ""),
+            sliderInput("age2",
+                        "Vehicle Age Segment 2:",
+                        min = 1995,
+                        max = 2020,
+                        value = c(2015,2020),
+                        sep = ""),
+         # sliderInput("age",
+         #             "Vehicle Age Segment:",
+         #             min = 1995,
+         #             max = 2020,
+         #             value = 2010,
+         #             sep = ""),
+         h3("CLV Cohort:"),
+         # numericInput('marketing', 'Marketing per Customer/year ($)', 76, min = 1, max = 9),
+         # numericInput('margin', 'Sales Margin - Parts&Labor (%)', 64, min = 1, max = 99),
+         # numericInput('discount', 'Discount Rate (%)', 10, min = 1, max = 50),
+         dateRangeInput("dates",'Customer Creation Date Range', min=dates$EarliestCust, max=dates$LatestCust,
                         start="2018-01-01", end="2018-12-31"),
                  hr()
          ),
@@ -84,29 +103,46 @@ tabPanel("Vehicle Age",
              ,valueBoxOutput("value2")
              ,valueBoxOutput("value3")
          ),
-         fluidRow(
-             box(
-                 title = "Average Revenue per Visit"
-                 ,status = "primary"
-                 ,solidHeader = TRUE
-                 ,collapsible = TRUE
-                 ,plotOutput("two_L")
-             )
-             ,box(
-                 title = "CLV per Customer Segment"
-                 ,status = "primary"
-                 ,solidHeader = TRUE
-                 ,collapsible = TRUE
-                 ,plotOutput("two_R")
-             )
-         ),
+        fluidRow(
+            box(
+                title = "Vehicle Age Segment 1"
+                ,status = "primary"
+                ,solidHeader = TRUE
+                ,collapsible = TRUE
+                ,plotOutput("two_L")
+            )
+            ,box(
+                title = "Vehicle Age Segment 2"
+                ,status = "primary"
+                ,solidHeader = TRUE
+                ,collapsible = TRUE
+                ,plotOutput("two_R")
+            )
+        ),
+        fluidRow(
+            box(
+                title = "Customer Lifetime Value"
+                ,status = "primary"
+                ,solidHeader = TRUE
+                ,collapsible = TRUE
+                ,plotOutput("three_L")
+            )
+            ,box(
+                title = "Average Invoice Amount and Time Between Visits"
+                ,status = "primary"
+                ,solidHeader = TRUE
+                ,collapsible = TRUE
+                ,plotOutput("three_R")
+            )
+        ),
         hr(),
         br(),
          # fluidRow(
-             column(12,
-                    # box(width = 12,
-                        title="Customer Return Rate by Segment",
-                        sankeyNetworkOutput("three_L", width = "100%")))
+             # column(12,
+             #        # box(width = 12,
+             #            title="Customer Return Rate by Segment",
+             #            sankeyNetworkOutput("three_L", width = "100%"))
+        )
          # )
         # )# End main panel
         )# End sidebar panel
@@ -128,20 +164,19 @@ tabPanel("MyCar Member",
              ,valueBoxOutput(width = 3,"timeBetweenVisits")
          ),
          fluidRow(
-             box(
-                 title = "My Car Customers"
+             title = "My Car Customers"
                  ,status = "primary"
                  ,solidHeader = TRUE
                  ,collapsible = TRUE
-                 ,plotOutput("MyCarAvgRevenue")
+                 ,plotOutput("MyCarRetentionHistory" 
              )
-             ,box(
-                 title = "Non-My Car Members"
-                 ,status = "primary"
-                 ,solidHeader = TRUE
-                 ,collapsible = TRUE
-                 ,plotOutput("MyCarRetentionHistory")
-             )
+             # ,box(
+             #     title = "Non-My Car Members"
+             #     ,status = "primary"
+             #     ,solidHeader = TRUE
+             #     ,collapsible = TRUE
+             #     ,plotOutput("MyCarRetentionHistory")
+             # )
          ),
          fluidRow(
              box(
@@ -149,7 +184,7 @@ tabPanel("MyCar Member",
                  ,status = "primary"
                  ,solidHeader = TRUE
                  ,collapsible = TRUE
-                 ,plotOutput("myCarCLV")
+                 ,plotOutput("myCarCLV2018")
              )
          )
 )   
@@ -168,7 +203,7 @@ tabPanel("MyCar Member",
               ),
           fluidRow(
               box(
-                  title = "CLV by Zipcode"
+                  title = "CLV by City"
                   ,status = "primary"
                   ,solidHeader = TRUE
                   ,collapsible = TRUE
@@ -344,15 +379,18 @@ tabPanel("Map",
 #######################################################################################################################################
 #######################################################################################################################################
 
-total.revenue <- as.numeric(round(invoice %>% summarise(sum(Total.Line.Revenue)), 2))
-total.customers <- as.numeric(round(invoice %>% group_by(CUSTOMER_NUMBER) %>% select(CUSTOMER_NUMBER) %>% unique() %>% nrow(), 2))
-customer.2018 <- as.numeric(round(invoice %>% filter(createYear == 2018) %>% group_by(CUSTOMER_NUMBER) %>% select(CUSTOMER_NUMBER) %>% unique() %>% nrow(), 2))
 
-myCarCLV=invoice %>% filter(createYear==2018) %>% 
-    group_by(MyCarClub, visit) %>% summarise(count=n(), 
-                                             avgTimeBeteen=mean(TimeToNextVisit, na.rm = TRUE), 
-                                             AvgProfit=mean(Revenue.Less.Cost)) %>% 
-    group_by(MyCarClub) %>% mutate(totalSegment=first(count), perActive=count/totalSegment) 
+# myCarCLV2018=invoice %>% filter(createYear>=2018) %>% 
+#     group_by(MyCarClub, visit) %>% summarise(count=n(), 
+#                                              avgTimeBeteen=mean(TimeToNextVisit, na.rm = TRUE), 
+#                                              AvgProfit=mean(Revenue.Less.Cost)) %>% 
+#     group_by(MyCarClub) %>%
+#       mutate(totalSegment=first(count), perActive=count/totalSegment) 
+myCarCLV2018=invoice %>% filter(createYear>=2018) %>% 
+  group_by(visit, EverMyCar) %>% summarise(count=n(), 
+                                           avgTimeBeteen=mean(TimeToNextVisit, na.rm = TRUE), 
+                                           AvgProfit=mean(Revenue.Less.Cost)) %>% 
+  mutate(totalSegment=first(count), perActive=count/totalSegment) 
 
 
 # create the server functions for the dashboard  
@@ -360,6 +398,11 @@ server <- function(input, output) {
     #some data manipulation to derive the values of KPI boxes
     #creating the valueBoxOutput content
     output$value1 <- renderValueBox({
+      start=lubridate::ymd(input$dates[1])
+      end=lubridate::ymd(input$dates[2])
+      total.revenue <- as.numeric(round(invoice %>% filter(CUST_CREATE_DATE >= start & CUST_CREATE_DATE <= end) %>% summarise(sum(Total.Line.Revenue)), 2))
+       # <- as.numeric(round(invoice %>% summarise(sum(Total.Line.Revenue)), 2))
+      
         valueBox(
             paste0('$',formatC(as.numeric(total.revenue/1000000)),"")
             ,'MM Total Reveneue'
@@ -367,6 +410,10 @@ server <- function(input, output) {
             ,color = "green")  
     })
     output$value2 <- renderValueBox({ 
+      start=lubridate::ymd(input$dates[1])
+      end=lubridate::ymd(input$dates[2])
+      total.customers <- as.numeric(round(invoice  %>% filter(CUST_CREATE_DATE >= start & CUST_CREATE_DATE <= end)%>% group_by(CUSTOMER_NUMBER) %>% select(CUSTOMER_NUMBER) %>% unique() %>% nrow(), 2))
+      
         valueBox(
             formatC(as.numeric(total.customers), format="f", big.mark=',', drop0trailing = TRUE)
             ,'Total Unique Customers'
@@ -374,23 +421,28 @@ server <- function(input, output) {
             ,color = "olive")  
     })
     output$value3 <- renderValueBox({
+      start=lubridate::ymd(input$dates[1])
+      end=lubridate::ymd(input$dates[2])
+      # customers <- as.numeric(round(invoice%>% filter(CUST_CREATE_DATE >= start & CUST_CREATE_DATE <= end)  %>% group_by(CUSTOMER_NUMBER) %>% select(CUSTOMER_NUMBER) %>% unique() %>% nrow(), 2))
+      total.revenue <- as.numeric(round(invoice %>% filter(CUST_CREATE_DATE >= start & CUST_CREATE_DATE <= end) %>% summarise(sum(Revenue.Less.Cost)), 2))
+      
         valueBox(
-            formatC(customer.2018, format="f", big.mark=',', drop0trailing = TRUE)
-            ,'New Customers in 2018'
-            ,icon = icon("smile",lib='font-awesome')
-            ,color = "purple")   
+          paste0('$',formatC(as.numeric(total.revenue/1000000)),"")
+          ,'MM Total Profit'
+          ,icon = icon("money-bill-wave",lib='font-awesome')
+          ,color = "green")    
     })
 ############################
     output$mycarCust <- renderValueBox({
-        numCust=myCarCLV %>% ungroup() %>%  filter(MyCarClub=="True" & visit==1) %>% select(count)
+        numCust=myCarCLV2018 %>% ungroup() %>%  filter(EverMyCar==TRUE & visit==1) %>% select(count)
             valueBox(width=3,
                 formatC(as.numeric(numCust))
-                ,'New My Car Customers in 2018'
+                ,'New My Car Customers (2018-2021)'
                 ,icon = icon("smile",lib='font-awesome')
                 ,color = "green")  
         })
     output$mycarAvgRev <- renderValueBox({ 
-        avg=invoice %>% filter(MyCarClub=="True") %>% summarise(mean(Total.Line.Revenue))
+        avg=invoice %>% filter(EverMyCar==TRUE) %>% summarise(mean(Total.Line.Revenue))
         valueBox(width=3,
             paste0('$ ',formatC(as.numeric(avg)))
             ,'Average Invoice amount (My-Car Customers)'
@@ -398,26 +450,25 @@ server <- function(input, output) {
             ,color = "green")  
     })
     output$mycarAvgVisits <- renderValueBox({
-        numCust=myCarCLV %>% ungroup() %>%  filter(MyCarClub=="False" & visit==1) %>% select(count)
-        
+        numCust=myCarCLV2018 %>% ungroup() %>%  filter(EverMyCar==FALSE & visit==1) %>% select(count)
         valueBox(width=3,
                  formatC(round(as.numeric(numCust),0),format="f", big.mark = ',', drop0trailing = TRUE)
-                 ,'New in 2018 (Not My Car Customers)'
+                 ,'New Customers 2018-2021 (Not My Car Customers)'
                  ,icon = icon("smile",lib='font-awesome')
                  ,color = "orange") 
     })
     output$mycartimeBetweenVisits <- renderValueBox({
         
-        avg=invoice %>% filter(MyCarClub=="False") %>% summarise(mean(Total.Line.Revenue))
+        avg=invoice %>% filter(EverMyCar==FALSE) %>% summarise(mean(Total.Line.Revenue))
         valueBox(width=3,
                  paste0('$ ',formatC(as.numeric(avg)))
-                 ,'Average Invoice amount (My-Car Customers)'
+                 ,'Average Invoice amount (Non My-Car Customers)'
                  ,icon = icon("money-bill-wave",lib='font-awesome')
                  ,color = "orange")  
     })
     ####################
     output$Cust <- renderValueBox({
-        avg=invoice %>% filter(MyCarClub=="True") %>% summarise(mean(numVisits))
+        avg=invoice %>% filter(EverMyCar==TRUE) %>% summarise(mean(numVisits))
         
         valueBox(width=3,
                  formatC(round(as.numeric(avg),1), format="f", big.mark=',', drop0trailing = TRUE)
@@ -426,7 +477,7 @@ server <- function(input, output) {
                  ,color = "green")   
     })
     output$AvgRev <- renderValueBox({ 
-        avg=invoice %>% filter(MyCarClub=="True") %>% summarise(mean(TimeToNextVisit, na.rm = TRUE))
+        avg=invoice %>% filter(EverMyCar==TRUE) %>% summarise(mean(TimeToNextVisit, na.rm = TRUE))
         
         valueBox(width=3,
                  formatC(round(as.numeric(avg),1), format="f", big.mark=',', drop0trailing = TRUE)
@@ -436,16 +487,16 @@ server <- function(input, output) {
         
     })
     output$AvgVisits <- renderValueBox({
-        avg=invoice %>% filter(MyCarClub=="False") %>% summarise(mean(numVisits))
+        avg=invoice %>% filter(EverMyCar==FALSE) %>% summarise(mean(numVisits))
         
         valueBox(width=3,
                  formatC(round(as.numeric(as.numeric(avg),1)), format="f", big.mark=',', drop0trailing = TRUE)
-                 ,'Average Vists from 2018-2020 (My-Car Customers)'
+                 ,'Average Vists from 2018-2020 (Non My-Car Customers)'
                  ,icon = icon("door-open",lib='font-awesome')
                  ,color = "orange")   
     })
     output$timeBetweenVisits <- renderValueBox({
-        avg=invoice %>% filter(MyCarClub=="False") %>% summarise(mean(TimeToNextVisit, na.rm = TRUE))
+        avg=invoice %>% filter(EverMyCar==FALSE) %>% summarise(mean(TimeToNextVisit, na.rm = TRUE))
         
         valueBox(width=3,
                  formatC(round(as.numeric(avg),1), format="f", big.mark=',', drop0trailing = TRUE)
@@ -455,24 +506,46 @@ server <- function(input, output) {
     })
     #creating the plotOutput content
     output$two_L <- renderPlot({
-        vehage <- invoice %>%
-            mutate(factor=case_when(
-                CAR_YEAR>=input$age ~ paste0(input$age,' or Newer'),
-                TRUE ~ paste0('Older than ',input$age)
-            )) %>% group_by(factor) %>%  summarise(AverageInvoice=mean(Total.Line.Revenue))
+      # input=tibble(
+      #              discount=10,
+      #              dates=c("2018-01-01", "2018-12-31"),
+      #              age=c("1995", "2000"),
+      #              age2=c("2000", "2005")
+      #              )
+      
+        group1=paste0(input$age[1], ' to ', input$age[2])
+        group2=paste0(input$age2[1], ' to ', input$age2[2])
+        start=lubridate::ymd(input$dates[1])
+        end=lubridate::ymd(input$dates[2])
         
-        vehage %>% ggplot(aes(x=factor, y=AverageInvoice, fill=factor)) +
-            geom_col() +
-            geom_text(nudge_y = 5,aes(x=factor, y=AverageInvoice, label=paste0(round(AverageInvoice,0),'$'))) +
-            scale_y_continuous(labels = label_comma(accuracy = NULL, scale = 1,
-                                                    prefix = "$", suffix = "",
-                                                    big.mark = ",", decimal.mark = ".")) +
-            labs(x="", title="Average Revenue Per Visit") +
-            theme_tufte()+ scale_fill_brewer(palette = palette) + My_Theme
+        CLVInvoice=invoice %>% filter(CUST_CREATE_DATE >= start & CUST_CREATE_DATE <= end)
+        # print(input$dates)
+        # print(input$age)
+        
+        vehage <- CLVInvoice %>% 
+            mutate(factor=case_when(
+                CAR_YEAR>=input$age[1] & CAR_YEAR<=input$age[2]  ~ paste0(input$age[1], ' to ', input$age[2]),
+                CAR_YEAR>=input$age2[1] & CAR_YEAR<=input$age2[2]  ~ paste0(input$age2[1], ' to ', input$age2[2]),
+                TRUE ~ paste0('remove'))) %>% 
+            filter (factor != "remove")
+        
+        vehage %>% 
+            group_by(factor, visit) %>% summarise(count=n(), AvgProfit=mean(Revenue.Less.Cost)) %>% 
+            filter(as.numeric(visit)<=10) %>% 
+            mutate(dropoff = count/lag(count)) %>%
+            mutate(dropoff = case_when(is.na(dropoff)~1, TRUE ~ dropoff)) %>%
+            filter(factor == group1) %>% 
+            ggplot(aes(x=as.factor(visit), y=count, fill=AvgProfit)) +geom_col() +
+            # facet_wrap(~factor) +
+            geom_text(nudge_y = 400,aes(x=as.numeric(visit),y=count,label=paste0(round(dropoff*100,0),"%"))) +
+            theme_minimal() + scale_y_continuous(labels = label_comma(), breaks = pretty_breaks()) +
+            labs(title=group1, x= "Visit Number", y="Number of Customers", fill="Average Profit") + My_Theme
+     
     })
     # scaleFUN <- function(x) sprintf("%.2f", x)
     output$two_R <- renderPlot({
-        print("3")
+        group1=paste0(input$age[1], ' to ', input$age[2])
+        group2=paste0(input$age2[1], ' to ', input$age2[2])
         start=lubridate::ymd(input$dates[1])
         end=lubridate::ymd(input$dates[2])
         CLVInvoice=invoice %>% filter(CUST_CREATE_DATE >= start & CUST_CREATE_DATE <= end)
@@ -481,134 +554,95 @@ server <- function(input, output) {
         
         vehage <- CLVInvoice %>% 
             mutate(factor=case_when(
-                CAR_YEAR>=input$age ~ paste0(input$age, ' or Newer'),
-                TRUE ~ paste0('Older than ',input$age)
-            )) %>% filter(visit<=6)
+                CAR_YEAR>=input$age[1] & CAR_YEAR<=input$age[2]  ~ paste0(input$age[1], ' to ', input$age[2]),
+                CAR_YEAR>=input$age2[1] & CAR_YEAR<=input$age2[2]  ~ paste0(input$age2[1], ' to ', input$age2[2]),
+                TRUE ~ paste0('remove'))) %>% 
+            filter (factor != "remove")
         
-        marketingpp=as.numeric(input$marketing/2)
-        discount=1+(as.numeric(input$discount)*.01)
-        marginPercent=(100-as.numeric(input$margin))*.01
-        
-        print(marketingpp)
-        print(discount)
-        print(marginPercent)
-        vehage %>% group_by(factor, visit) %>% summarise(AvgVisitRev=mean(Total.Line.Revenue), customers=n()) %>%  arrange(desc(visit))
-        
-        clvAge <- vehage %>% group_by(factor, visit) %>% summarise(AvgVisitRev=mean(Total.Line.Revenue), customers=n()) %>% 
-            mutate(Attrition=customers/lag(customers)) %>% mutate(Attrition=case_when(is.na(Attrition)~1, TRUE ~ Attrition)) %>% 
-            mutate(AttrMult=Attrition*lag(Attrition)) %>% 
-            mutate(AttrMult=case_when(is.na(AttrMult)~1, TRUE ~ AttrMult)) %>% 
-            rowwise() %>% mutate(num=AvgVisitRev-(AvgVisitRev*marginPercent)-marketingpp)%>% 
-            rowwise() %>%  mutate(denominator=case_when(
-                visit==1 ~ 1,
-                visit==2 ~ discount,
-                visit==3 ~ discount^2,
-                visit==4 ~ discount^3,
-                visit==5 ~ discount^4,
-                visit==6 ~ discount^5)) %>% 
-            rowwise() %>% mutate(line=AttrMult*(num/denominator))
-        
-        clvAge <-clvAge %>% group_by(factor) %>% mutate(CLV=sum(line))
-        
-        p <- clvAge %>% group_by(factor) %>% summarise(CLV=CLV) %>% unique() 
-        
-        ggplot(p, aes(x=factor, y=CLV, fill=factor)) + geom_col() +
-            scale_y_continuous(labels = label_comma(accuracy = NULL, scale = 1,
-                                                    prefix = "$", suffix = "",
-                                                    big.mark = ",", decimal.mark = ".")) +
-            geom_text(nudge_y = 5,aes(x=factor, y=CLV, label=paste0(round(CLV,0),'$'))) +
-            labs(x="", title="", y="USD") + 
-            theme_tufte() + scale_fill_brewer(palette = palette) + My_Theme
+        vehage %>% 
+            group_by(factor, visit) %>% summarise(count=n(), AvgProfit=mean(Revenue.Less.Cost)) %>% 
+            filter(as.numeric(visit)<=10) %>% 
+            mutate(dropoff = count/lag(count)) %>%
+            mutate(dropoff = case_when(is.na(dropoff)~1, TRUE ~ dropoff)) %>%
+            filter(factor == group2) %>% 
+            ggplot(aes(x=as.factor(visit), y=count, fill=AvgProfit)) +geom_col() +
+            # facet_wrap(~factor) +
+            geom_text(nudge_y = 400,aes(x=as.numeric(visit),y=count,label=paste0(round(dropoff*100,0),"%"))) +
+            theme_minimal() + scale_y_continuous(labels = label_comma(), breaks = pretty_breaks()) +
+            labs(title=group2, x= "Visit Number", y="Number of Customers", fill="Average Profit") + My_Theme
+
+      
     })
-    output$three_L <- renderSankeyNetwork({
+    output$three_L <- renderPlot({
         start=lubridate::ymd(input$dates[1])
         end=lubridate::ymd(input$dates[2])
         CLVInvoice=invoice %>% filter(CUST_CREATE_DATE >= start & CUST_CREATE_DATE <= end)
-        factor1Sankey <- CLVInvoice %>%  filter(CAR_YEAR >= input$age) %>%
-            group_by(visit) %>%
-            summarise(visits=n()) %>%
-            filter(visit<=6) %>% mutate( group="factor1Sankey") %>%
-            arrange(desc(visits))  %>% mutate(per=paste0(round(visits/lag(visits)*100),'%'))
-        # rowwise() %>% mutate(per=paste0(visits,"\n",per))
+        # print(input$dates)
+        # print(input$age)
         
-        factor2Sankey  <- CLVInvoice %>% filter(CAR_YEAR<input$age) %>%
-            group_by(visit) %>%
-            summarise(visits=n()) %>%
-            filter(visit<=6) %>% mutate(group="factor2Sankey") %>%
-            arrange(desc(visits))  %>% mutate(per=paste0(round(visits/lag(visits)*100),'%'))
-        # rowwise() %>% mutate(per=paste0(visits,"\n",per))
+        vehage <- CLVInvoice %>% 
+            mutate(factor=case_when(
+                CAR_YEAR>=input$age[1] & CAR_YEAR<=input$age[2]  ~ paste0(input$age[1], ' to ', input$age[2]),
+                CAR_YEAR>=input$age2[1] & CAR_YEAR<=input$age2[2]  ~ paste0(input$age2[1], ' to ', input$age2[2]),
+                TRUE ~ paste0('remove'))) %>% 
+            filter (factor != "remove")
         
         
-        
-        all <- rbind(factor1Sankey,factor2Sankey)
-        
-        all <-  all %>% rowwise() %>% mutate(source=case_when(
-            visit== 1 ~ "2018Customers",
-            visit== 2 & group=="factor1Sankey" ~ "Visit~1",
-            visit== 2 & group=="factor2Sankey" ~ "Visit-1",
-            visit== 3 & group=="factor1Sankey" ~ "Visit~2",
-            visit== 3 & group=="factor2Sankey" ~ "Visit-2",
-            visit== 4 & group=="factor1Sankey" ~ "Visit~3",
-            visit== 4 & group=="factor2Sankey" ~ "Visit-3",
-            visit== 5 & group=="factor1Sankey" ~ "Visit~4",
-            visit== 5 & group=="factor2Sankey" ~ "Visit-4",
-            visit== 6 & group=="factor1Sankey" ~ "Visit~5",
-            visit== 6 & group=="factor2Sankey" ~ "Visit-5",
-            TRUE ~ "GFY")) %>%
-            mutate(target=case_when(
-                source== "2018Customers" & group=="factor2Sankey" ~ "Visit-1",
-                source== "2018Customers" & group=="factor1Sankey" ~ "Visit~1",
-                source== "Visit-1" ~ "Visit-2",
-                source== "Visit~1" ~ "Visit~2",
-                source== "Visit-2" ~ "Visit-3",
-                source== "Visit~2" ~ "Visit~3",
-                source== "Visit-3" ~ "Visit-4",
-                source== "Visit~3" ~ "Visit~4",
-                source== "Visit-4" ~ "Visit-5",
-                source== "Visit~4" ~ "Visit~5",
-                source== "Visit-5" ~ "Visit-6",
-                source== "Visit~5" ~ "Visit-6",
-                TRUE ~ "GFY"))
-        # .domain(['2018Customers','Visit-1','Visit-2','Visit-3','Visit-4','Visit-5','Visit-6','Visit~1','Visit~2','Visit~3','Visit~4','Visit~5'])
-        # .range(['#1b9e77','#000','#000','#1b9e77','#1b9e77','#1b9e77','#d95f02','#d95f02','#d95f02','#d95f02','#d95f02','#000']);"
-
-        color_scale <- 
-            "d3.scaleOrdinal()
-        .range(['#808080','#1b9e77','#d95f02']);"
-        
-        all$source= as.factor(all$source)
-        all$target= as.factor(all$target)
-        all
+        vehage <- vehage %>% group_by(factor, visit) %>% summarise(count=n(),
+                                                                   avgTimeBeteen=mean(TimeToNextVisit, na.rm = TRUE),
+                                                                   AvgProfit=mean(Revenue.Less.Cost)) %>%
+            group_by(factor) %>% mutate(totalSegment=first(count), perActive=count/totalSegment)
         
         
+        vehageSum <- vehage %>% group_by(factor, visit) %>% mutate(Profit=AvgProfit*count) %>% 
+            group_by(factor) %>% 
+            summarise(TotalProfit=sum(Profit), perCust=TotalProfit/first(count), custAtGroupOne=first(count))
         
-        nodes <- data.frame(
-            name=c(as.character(all$source),
-                   as.character(all$target)) %>% unique()
-        )
+        ggplot(vehageSum, aes(x=reorder(factor, -perCust), y=perCust, fill=factor(comma(round(custAtGroupOne,0))))) +
+            geom_col() + scale_y_continuous(labels = label_comma(accuracy = NULL, scale = 1,
+                                                                 prefix = "$", suffix = "",
+                                                                 big.mark = ",", decimal.mark = ".")) +
+            theme_minimal() +
+          scale_fill_manual(values=c("#3BB44A", "#000000"))+
+          # scale_fill_brewer(palette = palette) +
+            My_Theme + labs(x="", y="Customer Timetime Value", fill="# Customers") + theme(axis.text.x = element_text(angle=45, hjust = 1))
         
-        
-        nodes
-        nodes$group <- as.factor(c("a","b","b","b","b","b","c","c","c","c","c","d"))
-        
-        # library(networkD3)
-        
-        match(all$source, nodes$name)
-        all$IDsource <- match(all$source, nodes$name)-1
-        all$IDtarget <- match(all$target, nodes$name)-1
-        fontSize <- 16
-        nodeWidth <- 40
-        fontFamily <- "sans-serif"
-        # Make the Network
-        # HTML(h3("This is my app!"),'<br/>')
-        
-        p <- sankeyNetwork(Links = all, Nodes = nodes,
-                           Source = "IDsource", Target = "IDtarget",
-                           Value = "visits", NodeID = "name", NodeGroup = 'group', width=1000,
-                           sinksRight=FALSE, fontSize = fontSize, fontFamily = fontFamily, nodeWidth =nodeWidth, nodePadding = 40,
-                           colourScale = color_scale)
-    p
     })
+    
+    output$three_R <- renderPlot({
+        start=lubridate::ymd(input$dates[1])
+        end=lubridate::ymd(input$dates[2])
+        CLVInvoice=invoice %>% filter(CUST_CREATE_DATE >= start & CUST_CREATE_DATE <= end)
+        # print(input$dates)
+        # print(input$age)
+        
+        vehage <- CLVInvoice %>% 
+            mutate(factor=case_when(
+                CAR_YEAR>=input$age[1] & CAR_YEAR<=input$age[2]  ~ paste0(input$age[1], ' to ', input$age[2]),
+                CAR_YEAR>=input$age2[1] & CAR_YEAR<=input$age2[2]  ~ paste0(input$age2[1], ' to ', input$age2[2]),
+                TRUE ~ paste0('remove'))) %>% 
+            filter (factor != "remove")
+        
+        
+        vehage <- vehage %>% group_by(factor) %>% summarise(count=n(),
+                                                                   avgTimeBeteen=mean(TimeToNextVisit, na.rm = TRUE),
+                                                                   AvgInvoiceProfit=mean(Revenue.Less.Cost),
+                                                            avgVisits = mean(numVisits, na.rm=TRUE)) 
+
+        
+        ggplot(vehage, aes(x=reorder(factor, -AvgInvoiceProfit), y=AvgInvoiceProfit, fill=factor(comma(round(avgTimeBeteen,0))))) +
+            geom_col() + scale_y_continuous(labels = label_comma(accuracy = NULL, scale = 1,
+                                                                 prefix = "$", suffix = "",
+                                                                 big.mark = ",", decimal.mark = ".")) +
+            scale_fill_manual(values=c("#3BB44A", "#000000"))+
+            # scale_fill_brewer(palette=palette) +
+            theme_minimal() +
+            My_Theme + labs(x="", y="Average Invoice Profit", fill="Time Between Visits") + 
+            theme(axis.text.x = element_text(angle=45, hjust = 1)) 
+            
+        
+    })
+
     output$missing <- renderText({
         totals <- invoice %>% filter(INVOICE_DATE>= input$datesMap[1] &
                                          INVOICE_DATE<= input$datesMap[2])
@@ -623,6 +657,7 @@ server <- function(input, output) {
         zipcode_totals <- invoice %>% filter(INVOICE_DATE>= input$datesMap[1] &
                                                  INVOICE_DATE<= input$datesMap[2]) %>% 
             group_by(Zip.Code.Clean) %>% summarise(Revenue=sum(Total.Line.Revenue), count=n()) %>% 
+          ungroup() %>% 
             filter(Zip.Code.Clean != "") %>% filter(count >=50)
         
         zipcode_totals$Zip.Code.Clean = as.character(zipcode_totals$Zip.Code.Clean)
@@ -823,7 +858,7 @@ output$tires <- renderPlot({
 output$Retention <- renderPlot({
     invoice %>% filter(createYear==2018) %>% 
         group_by(visit) %>% summarise(count=n(), AvgProfit=mean(Revenue.Less.Cost)) %>% 
-        filter(as.numeric(visit)<=10 ) %>% 
+        filter(as.numeric(visit)<=7 ) %>% 
         mutate(dropoff = count/lag(count)) %>%
         mutate(dropoff = case_when(is.na(dropoff)~1, TRUE ~ dropoff)) %>%
         ggplot(aes(x=as.factor(visit), y=count, fill=AvgProfit)) +
@@ -835,7 +870,7 @@ output$Retention <- renderPlot({
 })
 
 output$Vehicles <- renderPlot({
-    z=invoice %>%  group_by(numVehicles) %>% summarise(num=n()) %>% mutate(total=sum(num))
+    # z=invoice %>%  group_by(numVehicles) %>% summarise(num=n()) %>% mutate(total=sum(num))
     z=invoice %>% group_by(CUSTOMER_NUMBER) %>% 
         summarise(numVehicles=n_distinct(VIN_NUMBER))
     
@@ -857,67 +892,75 @@ output$Vehicles <- renderPlot({
 output$customers <- renderPlot({
     
 inv=invoice
-inv$VIN_NUMBER[inv$VIN_NUMBER=='NULL'] = NA
-inv <- inv %>% drop_na(CUST_CREATE_DATE, VIN_NUMBER)
-inv %>% group_by(createYear) %>% summarise(Reveneue=sum(Total.Line.Revenue)) %>% 
-    ggplot(aes(x=createYear, y=Reveneue)) + geom_col()
+# inv$VIN_NUMBER[inv$VIN_NUMBER=='NULL'] = NA
+inv <- inv %>% drop_na(CUST_CREATE_DATE)
+# inv %>% group_by(createYear) %>% summarise(Reveneue=sum(Total.Line.Revenue)) %>% 
+#     ggplot(aes(x=createYear, y=Reveneue)) + geom_col()
 
 inv %>% group_by(createYear) %>% select(CUSTOMER_NUMBER) %>% unique() %>%  summarise(newCustomers=n()) %>% 
     ggplot(aes(x=createYear, y=newCustomers)) + geom_col() +
-    scale_y_continuous(labels = label_comma()) +
+    scale_y_continuous(labels = label_comma(), breaks=pretty_breaks()) +
     labs(title="", y="", x="")+ theme_minimal() + My_Theme
 })
 
 output$MyCarAvgRevenue <- renderPlot({
-    invoice %>% filter(createYear==2018 & MyCarClub=="True") %>% 
-        group_by(MyCarClub, visit) %>% summarise(count=n(), AvgProfit=mean(Revenue.Less.Cost)) %>% 
-        filter(as.numeric(visit)<=10 & ! is.na(MyCarClub)) %>% 
-        mutate(dropoff = count/lag(count)) %>%
-        mutate(dropoff = case_when(is.na(dropoff)~1, TRUE ~ dropoff)) %>%
-        ggplot(aes(x=as.factor(visit), y=count, fill=AvgProfit)) +geom_col() +
-        # facet_wrap(~MyCarClub) +
-        geom_text(nudge_y = 20,aes(x=as.numeric(visit),y=count,label=paste0(round(dropoff*100,0),"%"))) +
-        theme_minimal() + scale_y_continuous(labels = label_comma(), breaks = pretty_breaks()) +
-        labs(title="", x= "Visit Number", y="Number of Customers", fill="Average Profit") + My_Theme
+  invoice %>% filter(EverMyCar==TRUE &createYear >= 2018) %>% 
+    group_by(EverMyCar, visit) %>% summarise(count=n(), AvgProfit=mean(Revenue.Less.Cost)) %>% 
+    filter(as.numeric(visit)<=7 & ! is.na(EverMyCar)) %>% 
+    mutate(dropoff = count/lag(count)) %>%
+    mutate(dropoff = case_when(is.na(dropoff)~1, TRUE ~ dropoff)) %>%
+    ggplot(aes(x=as.factor(visit), y=count, fill=AvgProfit)) +
+    geom_col() +
+    geom_text(nudge_y = 20,aes(x=as.numeric(visit),y=count,label=paste0(round(dropoff*100,0),"%"))) +
+    theme_minimal() + scale_y_continuous(labels = label_comma(), breaks = pretty_breaks()) +
+    labs(title="", x= "Visit Number", y="Number of Customers", fill="Average Profit") + My_Theme
 })
 
 output$MyCarRetentionHistory <- renderPlot({
-
-    invoice %>% filter(createYear==2018 & MyCarClub=="False") %>% 
-        group_by(MyCarClub, visit) %>% summarise(count=n(), AvgProfit=mean(Revenue.Less.Cost)) %>% 
-        filter(as.numeric(visit)<=10 & ! is.na(MyCarClub)) %>% 
-        mutate(dropoff = count/lag(count)) %>%
-        mutate(dropoff = case_when(is.na(dropoff)~1, TRUE ~ dropoff)) %>%
-        ggplot(aes(x=as.factor(visit), y=count, fill=AvgProfit)) +geom_col() +
-        # facet_wrap(~MyCarClub) +
-        geom_text(nudge_y = 1000,aes(x=as.numeric(visit),y=count,label=paste0(round(dropoff*100,0),"%"))) +
-         theme_minimal() + scale_y_continuous(labels = label_comma(), breaks = pretty_breaks()) +
-        labs(title="", x= "Visit Number", y="Number of Customers", fill="Average Profit") + My_Theme
+  
+  invoice <- invoice %>% mutate(MyCarLabel=case_when(.$EverMyCar==TRUE ~ "My Car Member", .$EverMyCar==FALSE ~ "Non-Member"))
+  invoice %>% filter(createYear >= 2018) %>% 
+    group_by(MyCarLabel, visit) %>% summarise(count=n(), AvgProfit=mean(Revenue.Less.Cost)) %>% 
+    filter(as.numeric(visit)<=7 & ! is.na(MyCarLabel)) %>% 
+    mutate(dropoff = count/lag(count)) %>%
+    mutate(dropoff = case_when(is.na(dropoff)~1, TRUE ~ dropoff)) %>%
+    ggplot(aes(x=as.factor(visit), y=count, fill=AvgProfit)) +
+    geom_col() +
+    facet_wrap(~MyCarLabel) +
+    geom_text(nudge_y = 2000,aes(x=as.numeric(visit),y=count,label=paste0(round(dropoff*100,0),"%"))) +
+    theme_minimal() + scale_y_continuous(labels = label_comma(), breaks = pretty_breaks()) +
+    labs(title="", x= "Visit Number", y="Number of Customers", fill="Average Profit") + My_Theme
+  # invoice %>% filter(EverMyCar==FALSE & createYear >= 2018) %>% 
+  #   group_by(EverMyCar, visit) %>% summarise(count=n(), AvgProfit=mean(Revenue.Less.Cost)) %>% 
+  #   filter(as.numeric(visit)<=10 & ! is.na(EverMyCar)) %>% 
+  #   mutate(dropoff = count/lag(count)) %>%
+  #   mutate(dropoff = case_when(is.na(dropoff)~1, TRUE ~ dropoff)) %>%
+  #   ggplot(aes(x=as.factor(visit), y=count, fill=AvgProfit)) +geom_col() +
+  #   geom_text(nudge_y = 20,aes(x=as.numeric(visit),y=count,label=paste0(round(dropoff*100,0),"%"))) +
+  #   theme_minimal() + scale_y_continuous(labels = label_comma(), breaks = pretty_breaks()) +
+  #   labs(title="", x= "Visit Number", y="Number of Customers", fill="Average Profit") + My_Theme
     })
 
-output$myCarCLV <- renderPlot({
-    myCarCLV=invoice %>% filter(createYear==2018) %>%
-        group_by(MyCarClub, visit) %>% summarise(count=n(),
-                                                 avgTimeBeteen=mean(TimeToNextVisit, na.rm = TRUE),
-                                                 AvgProfit=mean(Revenue.Less.Cost)) %>%
-        group_by(MyCarClub) %>% mutate(totalSegment=first(count), perActive=count/totalSegment)
-    
-    myCarCLV %>% group_by(MyCarClub) %>% mutate(Profit=AvgProfit*(count*perActive)) %>% 
-        summarise(TotalProfit=sum(Profit), perCust=TotalProfit/first(count)) %>% ungroup() %>% 
-        mutate(cat=case_when(
-            MyCarClub=="True" ~ "My Car Club Member",
-            TRUE ~ "Non-member"
-        )) %>% 
-        ggplot(aes(x=cat, y=perCust, fill=cat)) +
-        geom_col() + theme_minimal() +
-        scale_fill_brewer(palette = palette) +
-        labs(x="", y="Customer Lifetime Value", fill="") +
-        My_Theme
+output$myCarCLV2018 <- renderPlot({
+    myCarCLV2018 %>% group_by(visit,EverMyCar) %>% mutate(Profit=AvgProfit*count) %>% 
+    group_by(EverMyCar) %>% 
+    summarise(TotalProfit=sum(Profit), perCust=TotalProfit/first(count)) %>% ungroup() %>% 
+    mutate(cat=case_when(
+      EverMyCar==TRUE ~ "My Car Club Member",
+      TRUE ~ "Non-member"
+    )) %>% 
+    ggplot(aes(x=cat, y=perCust, fill=cat)) +
+    geom_col() + theme_minimal() +
+    scale_fill_brewer(palette = "Dark2") +
+    labs(x="", y="Customer Lifetime Value", fill="") +
+    geom_text(nudge_y = 20,aes(x=cat, y=perCust, label=paste0('$ ',round(perCust,0)))) +
+    My_Theme
 
 })
 
 output$NumVehicles <- renderPlot({
-    invoice %>% filter(createYear==2018) %>% 
+    invoice %>% filter(createYear >= 2018) %>% 
+    filter(numVehiclesFactor != "10+") %>% 
         group_by(numVehiclesFactor) %>% summarise(num=n()) %>% 
         mutate(total=sum(num), per=num/total) %>% 
         ggplot(aes(x=as.factor(numVehiclesFactor), y=num)) + geom_col() +
@@ -927,7 +970,8 @@ output$NumVehicles <- renderPlot({
 })
 
 output$vehicleCLV <- renderPlot({
-    numVeh=invoice %>% filter(createYear==2018) %>%
+    numVeh=invoice %>% filter(createYear >= 2018) %>%
+      filter(numVehiclesFactor != "10+") %>% 
         group_by(numVehiclesFactor, visit) %>% summarise(count=n(),
                                                  avgTimeBeteen=mean(TimeToNextVisit, na.rm = TRUE),
                                                  AvgProfit=mean(Revenue.Less.Cost)) %>%
@@ -947,17 +991,20 @@ output$vehicleCLV <- renderPlot({
 
 output$visitByVehicle <- renderPlot({
     invoice %>% group_by(numVehiclesFactor) %>% 
-        summarise(meanTimeBetween = mean(TimeToNextVisit, na.rm = TRUE), numVisits = mean(numVisits)) %>% 
-        ggplot(aes(x=numVehiclesFactor, y=numVisits)) +
+        filter(numVehiclesFactor != "10+") %>% 
+        summarise(meanTimeBetween = mean(TimeToNextVisit, na.rm = TRUE), numVisits = mean(numVisits), averageInvoice=mean(Total.Line.Revenue)) %>% 
+        ggplot(aes(x=numVehiclesFactor, y=numVisits, fill=averageInvoice)) +
         geom_col() + theme_minimal() +
-        geom_text(aes(label=round(numVisits,1)), nudge_y = 5) +
-        labs(x="Vehicles Serviced", y="Average Number of Visits") + My_Theme +
+        geom_text(aes(label=round(numVisits,1)), nudge_y = 1) +
+        labs(x="Vehicles Serviced", y="Average Number of Visits", fill="Average Inovice $") + My_Theme +
         scale_y_continuous(breaks=pretty_breaks())
 })
 
 
 output$LifetimeRevByVehicle <- renderPlot({
-    invoice %>% filter(createYear==2018) %>% group_by(numVehiclesFactor) %>% 
+    invoice %>% filter(createYear==2018) %>% 
+        filter(numVehiclesFactor != "10+") %>% 
+        group_by(numVehiclesFactor) %>% 
         summarise(avgRevenue = sum(Total.Line.Revenue, na.rm = TRUE)) %>% 
         ggplot(aes(x=as.factor(numVehiclesFactor), y=avgRevenue)) +
         geom_col() + theme_minimal() +
@@ -1071,7 +1118,7 @@ output$City <- renderPlot({
                                                              prefix = "$", suffix = "",
                                                              big.mark = ",", decimal.mark = ".")) +
         theme_minimal() +
-        My_Theme + labs(x="", y="Customer Timetime Value", fill="# Customers") + theme(axis.text.x = element_text(angle=45, hjust = 1))
+        My_Theme + labs(x="", y="Customer Lifetime Value", fill="# Customers") + theme(axis.text.x = element_text(angle=45, hjust = 1))
 })
 
 
